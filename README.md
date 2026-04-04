@@ -1,6 +1,6 @@
 # GV-CRM `v1.0.0`
 
-A lightweight CRM built directly into [Google Voice](https://voice.google.com) to manage contacts, build lists, and run automated text messaging campaigns — without ever leaving the tab.
+A lightweight Chrome extension that builds a powerful **CRM** directly into *Google Voice* to manage contacts, build lists, and run automated text messaging campaigns — without ever leaving the tab.
 
 ---
 
