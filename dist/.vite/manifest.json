@@ -1,0 +1,43 @@
+{
+  "../../../../../../@crx/manifest": {
+    "file": "assets/crx-manifest.js-D1Gm5bA2.js",
+    "name": "crx-manifest.js",
+    "src": "../../../../../../@crx/manifest",
+    "isEntry": true
+  },
+  "_jsxRuntime.module-DYcKo6ph.js": {
+    "file": "assets/jsxRuntime.module-DYcKo6ph.js",
+    "name": "jsxRuntime.module"
+  },
+  "_main.jsx-loader-C0CDGeno.js": {
+    "file": "assets/main.jsx-loader-C0CDGeno.js",
+    "src": "_main.jsx-loader-C0CDGeno.js"
+  },
+  "src/background.js": {
+    "file": "assets/background.js-BnZJw1zN.js",
+    "name": "background.js",
+    "src": "src/background.js",
+    "isEntry": true
+  },
+  "src/main.jsx": {
+    "file": "assets/main.jsx-SUPLh_zW.js",
+    "name": "main.jsx",
+    "src": "src/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_jsxRuntime.module-DYcKo6ph.js"
+    ]
+  },
+  "src/popup/index.html": {
+    "file": "assets/popup-DTbOc3Nu.js",
+    "name": "popup",
+    "src": "src/popup/index.html",
+    "isEntry": true,
+    "imports": [
+      "_jsxRuntime.module-DYcKo6ph.js"
+    ],
+    "css": [
+      "assets/popup-Cijt2qJ9.css"
+    ]
+  }
+}
