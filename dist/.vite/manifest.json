@@ -1,6 +1,6 @@
 {
   "../../../../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-OtWFHeI6.js",
+    "file": "assets/crx-manifest.js-Cn2ouXyj.js",
     "name": "crx-manifest.js",
     "src": "../../../../../../@crx/manifest",
     "isEntry": true
@@ -9,18 +9,18 @@
     "file": "assets/jsxRuntime.module-DYcKo6ph.js",
     "name": "jsxRuntime.module"
   },
-  "_main.jsx-loader-DFmyC3k_.js": {
-    "file": "assets/main.jsx-loader-DFmyC3k_.js",
-    "src": "_main.jsx-loader-DFmyC3k_.js"
+  "_main.jsx-loader-BmRrYvY1.js": {
+    "file": "assets/main.jsx-loader-BmRrYvY1.js",
+    "src": "_main.jsx-loader-BmRrYvY1.js"
   },
   "src/background.js": {
-    "file": "assets/background.js-BnZJw1zN.js",
+    "file": "assets/background.js-BLrR6qWK.js",
     "name": "background.js",
     "src": "src/background.js",
     "isEntry": true
   },
   "src/main.jsx": {
-    "file": "assets/main.jsx-CW0XpKIz.js",
+    "file": "assets/main.jsx-5YOL9iWp.js",
     "name": "main.jsx",
     "src": "src/main.jsx",
     "isEntry": true,

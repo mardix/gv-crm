@@ -1,4 +1,4 @@
-const KEYS = ['vcrm_contacts', 'vcrm_lists', 'vcrm_campaigns', 'vcrm_settings'];
+const KEYS = ['vcrm_contacts', 'vcrm_lists', 'vcrm_campaigns', 'vcrm_forms', 'vcrm_settings'];
 
 export function loadData(cb) {
   chrome.storage.local.get(KEYS, d => {
@@ -16,6 +16,7 @@ export function loadData(cb) {
       }));
     const lists = d.vcrm_lists || [];
     const campaigns = d.vcrm_campaigns || [];
+    const forms = d.vcrm_forms || [];
     const rawS = d.vcrm_settings;
     const settings = {
       contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'],
@@ -23,7 +24,7 @@ export function loadData(cb) {
       hideRightSidebar: false,
       ...(rawS || {}),
     };
-    cb({ contacts, lists, campaigns, settings });
+    cb({ contacts, lists, campaigns, forms, settings });
   });
 }
 
@@ -32,6 +33,7 @@ export function saveData(state) {
     vcrm_contacts: state.contacts,
     vcrm_lists: state.lists,
     vcrm_campaigns: state.campaigns,
+    vcrm_forms: state.forms,
     vcrm_settings: state.settings,
   });
 }

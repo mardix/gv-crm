@@ -164,6 +164,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch(e => sendResponse({ error: e.message }));
     return true;
   }
+
+  if (msg.action === 'sendFormSubmission') {
+    const { url, payload } = msg;
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.ok ? { ok: true } : { error: 'HTTP ' + res.status })
+      .then(sendResponse)
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
 });
 
 async function runCampaign(tabId, { id, phones, message, imageData, delayMin, delayMax }) {

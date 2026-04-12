@@ -4,6 +4,7 @@ import { uid, campaignPhones, formatPhone } from './utils/utils';
 import { ContactsView } from './views/ContactsView';
 import { ListsView, CampaignsView } from './views/ListViews';
 import { SettingsView, IOView } from './views/SettingsViews';
+import { FormsView } from './views/FormsView';
 import { ContactModal } from './components/ContactModal';
 import { ListModal, CampaignModal, SyncSidebarModal } from './components/Modals';
 import { useConversationSync } from './hooks/useConversationSync';
@@ -17,6 +18,7 @@ export function App({ togBtn }) {
   const [contacts, setContacts] = useState([]);
   const [lists, setLists] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
+  const [forms, setForms] = useState([]);
   const [settings, setSettings] = useState({ contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Reached Out', 'Confirmed', 'Declined'], delayMin: 15, delayMax: 45 });
 
   // Filters & sort
@@ -35,12 +37,13 @@ export function App({ togBtn }) {
   const [contactModal, setContactModal] = useState(null);  // null | contact obj | 'new'
   const [listModal, setListModal] = useState(null);
   const [campaignModal, setCampaignModal] = useState(null);
+  const [formModal, setFormModal] = useState(null);
   const [syncModal, setSyncModal] = useState(false);
 
   const activeContact = useConversationSync();
   useDraftStash();
 
-  const state = { contacts, lists, campaigns, settings };
+  const state = { contacts, lists, campaigns, forms, settings };
 
   async function sendWebhook(manual = false) {
     if (!settings.webhookUrl) {
@@ -65,6 +68,7 @@ export function App({ togBtn }) {
       setContacts(d.contacts);
       setLists(d.lists);
       setCampaigns(d.campaigns);
+      setForms(d.forms || []);
       setSettings(d.settings);
       setLoaded(true);
     });
@@ -123,7 +127,7 @@ export function App({ togBtn }) {
       saveData(state);
       if (settings.webhookAuto) sendWebhook();
     }
-  }, [contacts, lists, campaigns, settings]);
+  }, [contacts, lists, campaigns, forms, settings]);
 
   function switchView(v) {
     setView(v); setSearch(''); setFilterStatus(''); setFilterListId(''); setFilterListStatus(''); setFilterTag('');
@@ -272,13 +276,15 @@ export function App({ togBtn }) {
     setView('campaigns');
   }
 
-  const addBtn = view === 'contacts' ? { label: '+ Add Contact', action: () => setContactModal('new') }
+  const addBtn =
+    view === 'contacts' ? { label: '+ New Contact', action: () => setContactModal('new') }
     : view === 'lists' ? { label: '+ New List', action: () => setListModal('new') }
-      : view === 'campaigns' ? { label: '+ New Campaign', action: () => setCampaignModal('new') }
-        : null;
+    : view === 'forms' ? { label: '+ New Form', action: () => setFormModal('new') }
+    : view === 'campaigns' ? { label: '+ New Campaign', action: () => setCampaignModal('new') }
+    : null;
 
   function handleDownloadState() {
-    const payload = JSON.stringify({ contacts, lists, campaigns, settings }, null, 2);
+    const payload = JSON.stringify({ contacts, lists, campaigns, forms, settings }, null, 2);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
     a.download = `gvcrm-state-${new Date().toISOString().slice(0, 10)}.json`;
@@ -293,6 +299,7 @@ export function App({ togBtn }) {
       if (data.contacts && Array.isArray(data.contacts)) setContacts(data.contacts);
       if (data.lists && Array.isArray(data.lists)) setLists(data.lists);
       if (data.campaigns && Array.isArray(data.campaigns)) setCampaigns(data.campaigns);
+      if (data.forms && Array.isArray(data.forms)) setForms(data.forms);
       if (data.settings && typeof data.settings === 'object') setSettings(s => ({ ...s, ...data.settings }));
       alert('✓ State restored successfully.');
     } catch (e) {
@@ -383,7 +390,7 @@ export function App({ togBtn }) {
   const allTagsList = [...new Set(contacts.flatMap(c => c.tags || []))].sort();
   const active = contacts.filter(c => ['Active', 'VIP'].includes(c.status)).length;
 
-  const TABS = [['contacts', 'Contacts'], ['lists', 'Lists'], ['campaigns', '📣 Campaigns'], ['settings', '⚙ Settings']];
+  const TABS = [['contacts', 'Contacts'], ['lists', 'Lists'], ['campaigns', '📣 Campaigns'], ['forms', '📋 Forms'], ['settings', '⚙ Settings']];
 
   if (!loaded) return null;
 
@@ -558,6 +565,16 @@ export function App({ togBtn }) {
               <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) setCampaigns(cs => cs.filter(c => c.id !== id)); }} onDuplicate={handleDuplicateCampaign} />
             </div>
           )}
+          {view === 'forms' && (
+            <FormsView 
+              forms={forms} 
+              editingForm={formModal}
+              onEdit={f => setFormModal(f)} 
+              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); } }} 
+              onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); setFormModal(null); }}
+              onClose={() => setFormModal(null)}
+            />
+          )}
           {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
         </div>
       </div>
@@ -570,6 +587,7 @@ export function App({ togBtn }) {
         onDelete={id => { setContacts(cs => cs.filter(c => c.id !== id)); setContactModal(null); }}
         onClose={() => setContactModal(null)}
       />}
+
       {listModal && <ListModal
         list={listModal === 'new' ? null : listModal}
         onSave={l => { setLists(ls => { const i = ls.findIndex(x => x.id === l.id); return i >= 0 ? ls.map((x, j) => j === i ? l : x) : [l, ...ls]; }); setListModal(null); }}
@@ -588,11 +606,8 @@ export function App({ togBtn }) {
       {/* Context Widget (Phase 3) */}
       <ContextWidget
         activeContact={activeContact}
-        contacts={contacts}
-        lists={lists}
-        settings={settings}
-        onAdd={handleAddFromContext}
-        onEdit={setContactModal}
+        contacts={contacts} lists={lists} forms={forms} settings={settings}
+        onAdd={handleAddFromContext} onEdit={c => setContactModal(c)}
       />
 
       {!open && (
