@@ -4,7 +4,7 @@ import { Btn } from '../components/Btn';
 import { palFor, campaignPhones, CAMP_PAL } from '../utils/utils';
 
 export function ListsView({ lists, contacts, settings, search, onEdit, onDelete, onFilter }) {
-  const filtered = lists.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = lists.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true}));
   if (!filtered.length) return <Empty icon="📋" text={"No lists yet.\nClick + New List to create one."} />;
 
   return (

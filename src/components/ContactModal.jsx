@@ -53,7 +53,7 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderBottom: `1px solid #f8fafc` }}>
               <Select value={entry.listId} onChange={e => { const nl = [...data.lists]; nl[i] = { ...nl[i], listId: e.target.value }; set('lists', nl); }} style={{ flex: 1, minWidth: 0, padding: '6px 28px 6px 9px', fontSize: '12px' }}>
                 <option value="">— List —</option>
-                {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </Select>
               <span style={{ color: "#94a3b8", flexShrink: 0 }}>→</span>
               <Select value={entry.status} onChange={e => { const nl = [...data.lists]; nl[i] = { ...nl[i], status: e.target.value }; set('lists', nl); }} style={{ flex: 1, minWidth: 0, padding: '6px 28px 6px 9px', fontSize: '12px' }}>

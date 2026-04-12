@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GV-CRM",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A lightweight Contact Manager panel inside Google Voice.",
   "permissions": ["storage", "activeTab", "scripting", "debugger"],
   "host_permissions": ["https://voice.google.com/*", "<all_urls>"],

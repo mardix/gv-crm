@@ -2,6 +2,16 @@ export const uid = () => Date.now().toString(36) + Math.random().toString(36).sl
 
 export const ini = n => n ? n.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
 
+export function formatPhone(phone) {
+  if (!phone) return '';
+  const cleaned = ('' + phone).replace(/\D/g, '');
+  const match = cleaned.match(/^(?:1)?(\d{3})(\d{3})(\d{4})$/);
+  if (match) {
+    return `(${match[1]}) ${match[2]}-${match[3]}`;
+  }
+  return phone.trim(); // fallback if not exactly a 10-digit NA number
+}
+
 const PAL = [
   ['#e0e7ff', '#3730a3'], ['#d1fae5', '#065f46'], ['#fef3c7', '#92400e'],
   ['#fce7f3', '#9d174d'], ['#dbeafe', '#1e40af'], ['#ede9fe', '#5b21b6'],

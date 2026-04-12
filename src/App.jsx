@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { loadData, saveData } from './utils/storage';
-import { uid, campaignPhones } from './utils/utils';
+import { uid, campaignPhones, formatPhone } from './utils/utils';
 import { ContactsView } from './views/ContactsView';
 import { ListsView, CampaignsView } from './views/ListViews';
 import { SettingsView, IOView } from './views/SettingsViews';
@@ -134,20 +134,72 @@ export function App({ togBtn }) {
     else { setSortCol(col); setSortDir('asc'); }
   }
 
-  function handleImport(rows, onResult) {
-    let imp = 0, skip = 0;
+  function handleImport(rows, onResult, selectedListIds = []) {
+    let imp = 0, upd = 0;
     const newContacts = [...contacts];
+    
     rows.forEach(row => {
-      const phone = String(row.phone || '').trim(), email = String(row.email || '').trim().toLowerCase();
+      // Find the first value in the row if headers like 'phone' don't explicitly exist (for unstructured CSV/pasted lists)
+      const rawPhone = String(row.phone || Object.values(row)[0] || '').trim();
+      const phoneDigits = rawPhone.replace(/\D/g, '');
+      const email = String(row.email || '').trim().toLowerCase();
       let name = String(row.name || '').trim();
-      if (!name) name = phone;
-      if (newContacts.some(c => (phone && c.phone && c.phone.replace(/\D/g, '') === phone.replace(/\D/g, '')) || (email && c.email && c.email.toLowerCase() === email))) { skip++; return; }
-      newContacts.push({ id: uid(), name, phone, email, handle: String(row.handle || '').trim(), city: String(row.city || '').trim(), state: String(row.state || '').trim(), location: String(row.location || '').trim(), status: String(row.status || '').trim(), tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean), comment: String(row.comment || '').trim(), lists: [] });
-      imp++;
+      
+      if (!phoneDigits && !email) return; // Skip entirely empty rows
+      if (!name) name = rawPhone;
+
+      // Check if contact already exists
+      const existingIdx = newContacts.findIndex(c => 
+        (phoneDigits && c.phone && c.phone.replace(/\D/g, '') === phoneDigits) || 
+        (email && c.email && c.email.toLowerCase() === email)
+      );
+
+      const targetLists = selectedListIds.map(id => ({ listId: id, status: settings.listStatuses?.[0] || '' }));
+
+      if (existingIdx !== -1) {
+        // Upsert existing contact with lists they don't already have
+        const existingContact = newContacts[existingIdx];
+        const existingListIds = (existingContact.lists || []).map(l => l.listId);
+        const listsToAdd = targetLists.filter(tl => !existingListIds.includes(tl.listId));
+        
+        if (listsToAdd.length > 0) {
+          newContacts[existingIdx] = {
+            ...existingContact,
+            phone: formatPhone(existingContact.phone || rawPhone), // optionally enforce formatting on existing
+            lists: [...(existingContact.lists || []), ...listsToAdd]
+          };
+          upd++;
+        }
+      } else {
+        // Create brand new contact
+        newContacts.push({ 
+          id: uid(), 
+          name, 
+          phone: formatPhone(rawPhone), 
+          email, 
+          handle: String(row.handle || '').trim(), 
+          city: String(row.city || '').trim(), 
+          state: String(row.state || '').trim(), 
+          location: String(row.location || '').trim(), 
+          status: String(row.status || '').trim(), 
+          tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean), 
+          comment: String(row.comment || '').trim(), 
+          lists: targetLists 
+        });
+        imp++;
+      }
     });
+
     setContacts(newContacts);
-    if (imp > 0) onResult({ type: 'ok', text: `✓ Imported ${imp} contact${imp !== 1 ? 's' : ''}${skip ? ` (${skip} duplicate${skip !== 1 ? 's' : ''} skipped)` : ''}` });
-    else onResult({ type: 'warn', text: `No new contacts. ${skip} duplicate${skip !== 1 ? 's' : ''} skipped.` });
+
+    if (imp > 0 || upd > 0) {
+      const msgs = [];
+      if (imp > 0) msgs.push(`Imported ${imp} new contact${imp !== 1 ? 's' : ''}`);
+      if (upd > 0) msgs.push(`Updated lists for ${upd} existing contact${upd !== 1 ? 's' : ''}`);
+      onResult({ type: 'ok', text: `✓ ${msgs.join(' and ')}.` });
+    } else {
+      onResult({ type: 'warn', text: `No new contacts imported. (All rows matched existing contacts already in the selected lists).` });
+    }
   }
 
   function handleCampaignUpdate(id, action) {
@@ -252,7 +304,7 @@ export function App({ togBtn }) {
     setContactModal({
       id: uid(),
       name: active.contactName || active.formattedPhone || '',
-      phone: active.formattedPhone || '',
+      phone: formatPhone(active.formattedPhone || ''),
       status: 'Lead',
       tags: [],
       lists: [],
@@ -282,8 +334,8 @@ export function App({ togBtn }) {
         if (!newContacts.some(c => (c.phone || '').replace(/\D/g, '').endsWith(phone.slice(-10)))) {
           newContacts.push({
             id: uid(),
-            name: text,
-            phone: text,
+            name: text, // They are usually displayed as (XXX) XXX-XXXX in sidebar if unnamed
+            phone: formatPhone(text),
             status: 'Lead',
             tags: [],
             lists: listEntries,
@@ -410,7 +462,7 @@ export function App({ togBtn }) {
             {view === 'contacts' && (
               <>
                 {[['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
-                ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.map(l => ({ id: l.id, label: l.name }))],
+                ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => ({ id: l.id, label: l.name }))],
                 ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
                 ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
                 ].map(([placeholder, setter, val, opts], i) => (
@@ -474,7 +526,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Add to List…</option>
-                    {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   {/* Remove from List */}
@@ -484,7 +536,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Remove from List…</option>
-                    {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   <button onClick={() => {
@@ -514,7 +566,7 @@ export function App({ togBtn }) {
       {contactModal && <ContactModal
         contact={contactModal === 'new' ? null : contactModal}
         lists={lists} settings={settings}
-        onSave={c => { setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); setContactModal(null); }}
+        onSave={c => { c.phone = formatPhone(c.phone); setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); setContactModal(null); }}
         onDelete={id => { setContacts(cs => cs.filter(c => c.id !== id)); setContactModal(null); }}
         onClose={() => setContactModal(null)}
       />}

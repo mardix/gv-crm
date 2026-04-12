@@ -125,7 +125,7 @@ export function CampaignModal({ campaign, lists, settings, contacts, onSave, onD
         {!lists.length
           ? <p style={{ color: "#94a3b8", fontSize: '13px' }}>No lists yet — create lists first.</p>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {lists.map(list => {
+            {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
               const selection = normalizedSelections.find(s => s.listId === list.id);
               const sel = !!selection;
               const pc = campaignPhones([selection || list.id], contacts).length;
@@ -191,7 +191,7 @@ export function SyncSidebarModal({ lists, settings, onSync, onClose }) {
           <p style={{ fontSize: '13px', color: '#94a3b8' }}>No lists yet — you can create lists in the Lists tab.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {lists.map(list => {
+            {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
               const sel = selectedIds.includes(list.id);
               return (
                 <div
