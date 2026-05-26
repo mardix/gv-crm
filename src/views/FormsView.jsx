@@ -82,7 +82,7 @@ function FormEditor({ form, onSave, onClose }) {
   }
 
   function addField() {
-    setFields(prev => [...prev, { id: uid(), name: '', label: '', type: 'text', options: '', required: false, autofill: '' }]);
+    setFields(prev => [...prev, { id: uid(), name: '', label: '', type: 'text', value: '', options: '', required: false, autofill: '' }]);
   }
 
   function updateField(i, k, v) {
@@ -201,8 +201,16 @@ function FormEditor({ form, onSave, onClose }) {
                         <option value="textarea">Long Text</option>
                         <option value="number">Number</option>
                         <option value="select">Dropdown</option>
+                        <option value="hidden">Hidden Input</option>
                       </select>
                     </div>
+
+                    {f.type === 'hidden' && (
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <label style={LABEL}>Static Value</label>
+                        <input value={f.value || ''} onInput={e => updateField(i, 'value', e.target.value)} placeholder="Constant value to send" style={inp} onFocus={onFocus} onBlur={onBlur} />
+                      </div>
+                    )}
 
                     {f.type === 'select' && (
                       <div style={{ flex: 1, minWidth: '180px' }}>
@@ -226,7 +234,7 @@ function FormEditor({ form, onSave, onClose }) {
                     </div>
 
                     {/* Spacer so controls go right */}
-                    {f.type !== 'select' && <div style={{ flex: 1 }} />}
+                    {f.type !== 'select' && f.type !== 'hidden' && <div style={{ flex: 1 }} />}
 
                     {/* Required + reorder + delete */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, alignSelf: 'flex-end' }}>

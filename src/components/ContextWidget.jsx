@@ -202,6 +202,7 @@ function FormRunnerPanel({ form, contact, onClose, onDone }) {
   const [formData, setFormData] = useState(() => {
     const seed = {};
     (form.fields || []).forEach(f => {
+      if (f.value) seed[f.name] = f.value;
       if (f.autofill && contact?.[f.autofill]) seed[f.name] = contact[f.autofill];
     });
     return seed;
@@ -272,6 +273,7 @@ function FormRunnerPanel({ form, contact, onClose, onDone }) {
             <div style={{ fontSize: '12px', color: '#64748b' }}>Data sent successfully.</div>
           </div>
         ) : (form.fields || []).map(f => {
+          if (f.type === 'hidden') return null;
           const val = formData[f.name] ?? '';
           const setVal = v => setFormData(d => ({ ...d, [f.name]: v }));
           const opts = (f.options || '').split(',').map(x => x.trim()).filter(Boolean);
