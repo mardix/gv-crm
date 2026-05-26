@@ -92,7 +92,12 @@ export function App({ togBtn }) {
       if (msg.type === 'campaignDone' && msg.campaignId) {
         setCampaigns(cs => cs.map(c => {
           if (c.id !== msg.campaignId) return c;
-          return { ...c, status: 'done', completedAt: Date.now(), totalRecipients: c.totalRecipients ?? (c.log || []).length };
+          if (c.status === 'paused' || c.status === 'cancelled') return c;
+          const log = c.log || [];
+          const hasFailures = log.some(l => !l.ok);
+          const pending = c.totalRecipients ? c.totalRecipients - log.length : 0;
+          const newStatus = (hasFailures || pending > 0) ? 'paused' : 'done';
+          return { ...c, status: newStatus, completedAt: newStatus === 'done' ? Date.now() : c.completedAt, totalRecipients: c.totalRecipients ?? log.length };
         }));
       }
       if (msg.type === 'campaignStatus') {

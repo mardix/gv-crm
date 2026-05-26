@@ -101,6 +101,8 @@ export function CampaignsView({ campaigns, contacts, lists, activeStatus, onEdit
         const totalCount = isLocked && camp.totalRecipients != null ? camp.totalRecipients : livePhones.length;
         const log = camp.log || [];
         const sent = log.filter(l => l.ok).length, failed = log.filter(l => !l.ok).length;
+        const pendingCount = totalCount - log.length;
+        const showAsPaused = camp.status === 'paused' || (camp.status === 'done' && (failed > 0 || pendingCount > 0));
         const isExpanded = expandedId === camp.id;
         const isReportExpanded = reportExpandedId === camp.id;
         const isDraft = !isLocked;
@@ -292,14 +294,14 @@ export function CampaignsView({ campaigns, contacts, lists, activeStatus, onEdit
                 })()}
 
                 <div style={{ padding: '24px 28px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', background: '#fff' }}>
-                  {(camp.status === 'draft' || camp.status === 'ready') && <Btn variant="sm" onClick={() => onEdit(camp)} style={{ padding: '10px 20px' }}>Edit</Btn>}
+                  {(camp.status === 'draft' || camp.status === 'ready' || showAsPaused) && <Btn variant="sm" onClick={() => onEdit(camp)} style={{ padding: '10px 20px' }}>Edit</Btn>}
                   {(camp.status === 'draft' || camp.status === 'ready') && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'start')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Launch</Btn>}
 
                   {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'pause')} style={{ padding: '10px 20px', color: "#64748b" }}>⏸ Pause</Btn>}
                   {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
 
-                  {camp.status === 'paused' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'resume')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Resume</Btn>}
-                  {camp.status === 'paused' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
+                  {showAsPaused && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'resume')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Resume</Btn>}
+                  {showAsPaused && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
 
                   <Btn variant="sm" onClick={() => onDuplicate(camp)} style={{ padding: '10px 20px', color: '#4f46e5', borderColor: '#c7d2fe', background: '#f5f7ff' }}>❐ Duplicate</Btn>
 
