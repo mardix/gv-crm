@@ -74,11 +74,25 @@ function FormEditor({ form, onSave, onClose }) {
   function handleSave() {
     if (!name.trim()) return alert('Form Name is required.');
     if (!endpointUrl.trim()) return alert('Endpoint URL is required.');
-    if (fields.length === 0) return alert('Add at least one field.');
+
     const cleanFields = fields
-      .filter(f => f.name.trim() && f.label.trim())
-      .map(f => ({ ...f, name: f.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'), label: f.label.trim() }));
-    onSave({ id: form?.id || uid(), name: name.trim(), endpointUrl: endpointUrl.trim(), fields: cleanFields });
+      .filter(f => String(f.name || '').trim() && String(f.label || '').trim())
+      .map(f => ({
+        ...f,
+        name: String(f.name).trim(),   // keep as entered, only trim spaces
+        label: String(f.label).trim()
+      }));
+
+    if (cleanFields.length === 0) {
+      return alert('Add at least one valid field.');
+    }
+
+    onSave({
+      id: form?.id || uid(),
+      name: name.trim(),
+      endpointUrl: endpointUrl.trim(),
+      fields: cleanFields
+    });
   }
 
   function addField() {

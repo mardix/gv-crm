@@ -169,10 +169,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const { url, payload } = msg;
     fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
+      //headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-      .then(res => res.ok ? { ok: true } : { error: 'HTTP ' + res.status })
+      .then(res => res.ok ? { ok: true, res } : { error: 'HTTP ' + res.status })
       .then(sendResponse)
       .catch(e => sendResponse({ error: e.message }));
     return true;
