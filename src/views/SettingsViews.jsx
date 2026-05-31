@@ -306,8 +306,8 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
               </button>
             </div>
             <div style={{ borderTop: '1.5px solid #f1f1f7', margin: '14px -28px -28px', padding: '24px 28px 24px' }}>
-              <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#22c55e", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
-                📊 Full Sync to Google Sheets
+              <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
+                🔄 Full Sync with Google Sheets
               </button>
             </div>
           </div>

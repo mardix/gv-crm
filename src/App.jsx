@@ -19,7 +19,7 @@ export function App({ togBtn }) {
   const [lists, setLists] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [forms, setForms] = useState([]);
-  const [settings, setSettings] = useState({ contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Reached Out', 'Confirmed', 'Declined'], delayMin: 15, delayMax: 45, gsheetUrl: '', gsheetAuto: false });
+  const [settings, setSettings] = useState({ contactStatuses: ['Active', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Qualified', 'Unqualified'], delayMin: 15, delayMax: 45, gsheetUrl: '', gsheetAuto: false });
 
   // Filters & sort
   const [activeCampaignStatus, setActiveCampaignStatus] = useState(null);
@@ -77,9 +77,8 @@ export function App({ togBtn }) {
 
   function mapContactToGSheet(c) {
     const s = (c.status || '').toLowerCase();
-    let gsStatus = 'Review';
-    if (s === 'active' || s === 'vip') gsStatus = 'Active';
-    else if (s === 'inactive') gsStatus = 'Inactive';
+    let gsStatus = 'Active';
+    if (s === 'inactive') gsStatus = 'Inactive';
     else if (s === 'banned') gsStatus = 'Banned';
 
     return {
@@ -89,9 +88,8 @@ export function App({ togBtn }) {
       email: c.email,
       status: gsStatus,
       category: (s === 'vip' || c.tags?.some(t => t.toLowerCase() === 'vip')) ? 'VIP' : 'Regular',
-      membershipStatus: gsStatus,
       membershipLevel: 'Basic',
-      location: [c.city, c.state, c.location].filter(Boolean).join(', '),
+      location: c.location || '',
       handle: c.handle,
       note: c.comment,
       assignedLists: (c.lists || []).map(l => ({ listId: l.listId, status: l.status || 'Prospect' }))
@@ -148,18 +146,70 @@ export function App({ togBtn }) {
     await sendGSheetAction('deleteContactList', { listId: id });
   }
 
-  async function handleManualGSheetSync() {
+  async function handleGSheetSync() {
     if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
-    const ok = confirm('Trigger a full sync to Google Sheets? This will push all lists and all contacts. Large datasets will be synced in chunks.');
+    const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
     if (!ok) return;
 
     try {
-      // 1. Sync Lists (Bulk)
-      await gsheetSaveContactLists(lists);
-      // 2. Sync Contacts (Bulk with chunking)
-      const res = await gsheetSaveContacts(contacts, 100);
-      if (res.ok) alert(`✓ Full sync completed: Pushed ${lists.length} lists and ${contacts.length} contacts.`);
-      else alert('Sync partially failed: ' + (res.error || 'Unknown error'));
+      // PHASE 1: FETCH (Pull & Merge)
+      console.log('Sync Phase 1: Fetching lists...');
+      const listRes = await sendGSheetAction('readContactLists', {}, 'GET');
+      if (!listRes.ok) throw new Error(listRes.error || 'Failed to fetch lists');
+      
+      const sheetLists = (listRes.lists || []).map(l => ({
+        id: l.listId,
+        name: l.name,
+        description: l.description || ''
+      }));
+
+      console.log('Sync Phase 2: Fetching contacts...');
+      const contactRes = await sendGSheetAction('readContacts', { includeLists: true }, 'GET');
+      if (!contactRes.ok) throw new Error(contactRes.error || 'Failed to fetch contacts');
+
+      const sheetContacts = (contactRes.contacts || []).map(c => ({
+        id: c.contactId,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        handle: c.handle,
+        location: c.location || '',
+        status: c.status,
+        tags: c.category === 'VIP' ? ['VIP'] : [],
+        comment: c.note,
+        lists: (c.lists || []).map(l => ({
+          listId: l.listId,
+          status: l.membership?.status || 'Prospect'
+        }))
+      }));
+
+      // Merge into a temporary updated state
+      let updatedLists = [...lists];
+      sheetLists.forEach(sl => {
+        const idx = updatedLists.findIndex(l => l.id === sl.id);
+        if (idx >= 0) updatedLists[idx] = sl;
+        else updatedLists.push(sl);
+      });
+
+      let updatedContacts = [...contacts];
+      sheetContacts.forEach(sc => {
+        const idx = updatedContacts.findIndex(c => c.id === sc.id);
+        if (idx >= 0) updatedContacts[idx] = sc;
+        else updatedContacts.push(sc);
+      });
+
+      // PHASE 3: PUSH (Final Push back to GSheet)
+      console.log('Sync Phase 3: Pushing merged state back to GSheet...');
+      await gsheetSaveContactLists(updatedLists);
+      const pushRes = await gsheetSaveContacts(updatedContacts, 100);
+      
+      if (pushRes.ok) {
+        setLists(updatedLists);
+        setContacts(updatedContacts);
+        alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.`);
+      } else {
+        throw new Error(pushRes.error || 'Push phase failed');
+      }
     } catch (err) {
       alert('GSheet Sync Error: ' + err.message);
     }
@@ -289,9 +339,7 @@ export function App({ togBtn }) {
           phone: formatPhone(rawPhone),
           email,
           handle: String(row.handle || '').trim(),
-          city: String(row.city || '').trim(),
-          state: String(row.state || '').trim(),
-          location: String(row.location || '').trim(),
+          location: String(row.location || row.city || row.state || '').trim(),
           status: String(row.status || '').trim(),
           tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean),
           comment: String(row.comment || '').trim(),
@@ -688,7 +736,7 @@ export function App({ togBtn }) {
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleManualGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
         </div>
       </div>
 

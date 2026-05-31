@@ -19,8 +19,8 @@ export function loadData(cb) {
     const forms = d.vcrm_forms || [];
     const rawS = d.vcrm_settings;
     const settings = {
-      contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'],
-      listStatuses: ['Prospect', 'Reached Out', 'Confirmed', 'Declined'],
+      contactStatuses: ['Active', 'Inactive', 'Banned'],
+      listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
       hideRightSidebar: false,
       ...(rawS || {}),
     };

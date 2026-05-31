@@ -9,7 +9,7 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
   const isNew = !contact;
   const [data, setData] = useState(() => contact
     ? JSON.parse(JSON.stringify(contact))
-    : { id: uid(), name: '', phone: '', email: '', handle: '', city: '', state: '', location: '', tags: [], status: '', comment: '', lists: [], dnd: false }
+    : { id: uid(), name: '', phone: '', email: '', handle: '', location: '', tags: [], status: '', comment: '', lists: [], dnd: false }
   );
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
@@ -87,11 +87,7 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
         <Field label="Email"><Input value={data.email} onInput={e => set('email', e.target.value)} type="email" placeholder="jane@example.com" /></Field>
         <Field label="Social Handle"><Input value={data.handle} onInput={e => set('handle', e.target.value.replace(/^@+/, ''))} placeholder="username (no @)" /></Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        <Field label="City"><Input value={data.city} onInput={e => set('city', e.target.value)} placeholder="New York" /></Field>
-        <Field label="State / Region"><Input value={data.state} onInput={e => set('state', e.target.value)} placeholder="NY" /></Field>
-      </div>
-      <Field label="Location / Country"><Input value={data.location} onInput={e => set('location', e.target.value)} placeholder="Optional full address" /></Field>
+      <Field label="Location"><Input value={data.location} onInput={e => set('location', e.target.value)} placeholder="e.g. New York, NY" /></Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <Field label="Contact Status">
           <Select value={data.status} onChange={e => set('status', e.target.value)}>

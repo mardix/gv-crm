@@ -37,8 +37,8 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
   const COLS = [
     { key: '_sel', label: '' },
     { key: 'name', label: 'Name' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' },
-    { key: 'handle', label: 'Handle' }, { key: 'city', label: 'City' }, { key: 'state', label: 'State' },
-    { key: 'status', label: 'Status' }, { key: '_tags', label: 'Tags' }, { key: '_lists', label: 'Lists' }, { key: 'comment', label: 'Notes' },
+    { key: 'handle', label: 'Handle' },
+    { key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }, { key: '_tags', label: 'Tags' }, { key: '_lists', label: 'Lists' }, { key: 'comment', label: 'Notes' },
   ];
   const colW = ['40px', '230px', '130px', '180px', '110px', '100px', '70px', '110px', '130px', '220px', '200px'];
 
