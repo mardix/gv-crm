@@ -223,11 +223,9 @@ function FormRunnerPanel({ form, contact, onClose, onDone }) {
       crm_contact_phone: contact.phone || '',
       ...formData,
     };
-    console.log("RES-0", payload)
     chrome.runtime.sendMessage(
-      { action: 'sendFormSubmission', url: form.endpointUrl, payload },
+      { action: 'sendFormSubmission', url: form.endpointUrl, contentType: form.contentType || 'json', payload },
       (res) => {
-        console.log("RES", res)
         if (res && res.ok) {
           setStatus({ type: 'success' });
           setTimeout(onDone, 2200);

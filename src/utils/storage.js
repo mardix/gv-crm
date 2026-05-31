@@ -21,7 +21,7 @@ export function loadData(cb) {
     const settings = {
       contactStatuses: ['Active', 'Inactive', 'Banned'],
       listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
-      hideRightSidebar: false,
+      hideRightSidebar: true,
       ...(rawS || {}),
     };
     cb({ contacts, lists, campaigns, forms, settings });

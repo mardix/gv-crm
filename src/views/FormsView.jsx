@@ -63,11 +63,13 @@ export function FormsView({ forms, editingForm, onEdit, onDelete, onSave, onClos
 function FormEditor({ form, onSave, onClose }) {
   const [name, setName] = useState('');
   const [endpointUrl, setEndpointUrl] = useState('');
+  const [contentType, setContentType] = useState('json');
   const [fields, setFields] = useState([]);
 
   useEffect(() => {
     setName(form?.name || '');
     setEndpointUrl(form?.endpointUrl || '');
+    setContentType(form?.contentType || 'json');
     setFields(form?.fields || []);
   }, [form?.id]);
 
@@ -91,6 +93,7 @@ function FormEditor({ form, onSave, onClose }) {
       id: form?.id || uid(),
       name: name.trim(),
       endpointUrl: endpointUrl.trim(),
+      contentType,
       fields: cleanFields
     });
   }
@@ -166,6 +169,13 @@ function FormEditor({ form, onSave, onClose }) {
               <div>
                 <label style={LABEL}>Endpoint URL <span style={{ color: '#94a3b8', fontWeight: 500, textTransform: 'none', fontSize: '10px' }}>(POST)</span></label>
                 <input value={endpointUrl} onInput={e => setEndpointUrl(e.target.value)} placeholder="https://hooks.zapier.com/..." style={inp} onFocus={onFocus} onBlur={onBlur} />
+              </div>
+              <div>
+                <label style={LABEL}>Submission Content-Type</label>
+                <select value={contentType} onChange={e => setContentType(e.target.value)} style={sel} onFocus={onFocus} onBlur={onBlur}>
+                  <option value="json">JSON (application/json)</option>
+                  <option value="text">Text (text/plain)</option>
+                </select>
               </div>
             </div>
           </div>

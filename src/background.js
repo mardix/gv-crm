@@ -197,10 +197,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === 'sendFormSubmission') {
-    const { url, payload } = msg;
+    const { url, payload, contentType } = msg;
+    const headers = { 'Content-Type': contentType === 'text' ? 'text/plain' : 'application/json' };
     fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers,
       body: JSON.stringify(payload)
     })
       .then(res => res.text().then(text => {

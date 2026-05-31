@@ -156,7 +156,7 @@ export function App({ togBtn }) {
       console.log('Sync Phase 1: Fetching lists...');
       const listRes = await sendGSheetAction('readContactLists', {}, 'GET');
       if (!listRes.ok) throw new Error(listRes.error || 'Failed to fetch lists');
-      
+
       const sheetLists = (listRes.lists || []).map(l => ({
         id: l.listId,
         name: l.name,
@@ -202,7 +202,7 @@ export function App({ togBtn }) {
       console.log('Sync Phase 3: Pushing merged state back to GSheet...');
       await gsheetSaveContactLists(updatedLists);
       const pushRes = await gsheetSaveContacts(updatedContacts, 100);
-      
+
       if (pushRes.ok) {
         setLists(updatedLists);
         setContacts(updatedContacts);
@@ -504,7 +504,7 @@ export function App({ togBtn }) {
       if (res && res.ok && res.snapshot) {
         const payload = res.snapshot.data;
         if (!payload || typeof payload !== 'object') throw new Error('Snapshot payload is empty or invalid');
-        
+
         if (payload.contacts && Array.isArray(payload.contacts)) setContacts(payload.contacts);
         if (payload.lists && Array.isArray(payload.lists)) setLists(payload.lists);
         if (payload.campaigns && Array.isArray(payload.campaigns)) setCampaigns(payload.campaigns);
@@ -595,7 +595,7 @@ export function App({ togBtn }) {
         style.id = 'vcrm-layout-style';
         document.head.appendChild(style);
       }
-      style.textContent = `gv-call-sidebar { display: none !important; }`;
+      style.textContent = `gv-call-sidebar, .gb_v.gb_we { display: none !important; }`;
     } else if (style) {
       style.textContent = '';
     }
@@ -603,8 +603,13 @@ export function App({ togBtn }) {
 
   const allTagsList = [...new Set(contacts.flatMap(c => c.tags || []))].sort();
   const active = contacts.filter(c => ['Active', 'VIP'].includes(c.status)).length;
-
-  const TABS = [['contacts', 'Contacts'], ['lists', 'Lists'], ['campaigns', '📣 Campaigns'], ['forms', '📋 Forms'], ['settings', '⚙ Settings']];
+  const TABS = [
+    ['contacts', 'Contacts', contacts.length],
+    ['lists', 'Lists', lists.length],
+    ['campaigns', 'Campaigns', campaigns.length],
+    ['forms', 'Forms', forms.length],
+    ['settings', 'Settings', null]
+  ];
 
   if (!loaded) return null;
 
@@ -612,7 +617,7 @@ export function App({ togBtn }) {
     <div>
       <div id="vcrm-panel" style={{
         position: 'fixed', top: 0, right: 0, width: '920px', height: '100vh',
-        background: '#f1f5f9', borderLeft: `1px solid #e2e8f0`,
+        background: '#f8fafc', borderLeft: `1px solid #e2e8f0`,
         zIndex: 2147483645, display: 'flex', flexDirection: 'column',
         fontFamily: 'Inter,system-ui,sans-serif', fontSize: '13px', color: '#0f172a',
         transform: open ? 'translateX(0)' : 'translateX(100%)',
@@ -621,55 +626,136 @@ export function App({ togBtn }) {
         pointerEvents: open ? 'auto' : 'none',
       }}>
 
-        {/* ── Topbar ── */}
-        <div style={{ flexShrink: 0, height: '60px', background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '0 16px 0 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#6366f1,#4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '10px', fontWeight: 800 }}>GV</div>
+        {/* ── Modern Topbar Header ── */}
+        <div style={{ flexShrink: 0, height: '64px', background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          
+          {/* Logo Brand Panel */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5, #4338ca)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', fontWeight: 800, boxShadow: '0 2px 8px rgba(79,70,229,0.2)' }}>GV</div>
             <div>
-              <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a', letterSpacing: '-.2px', lineHeight: '1.2', fontFamily: 'Inter,sans-serif' }}>GV-CRM</div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: '1.2', fontFamily: 'Inter,sans-serif' }}>V1.0.0</div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
+              <div style={{ display: 'inline-flex', fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '99px', padding: '1px 6px', marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>V2.0</div>
             </div>
           </div>
-          <div style={{ width: '1px', height: '24px', background: "#e2e8f0", flexShrink: 0 }}></div>
-          <div style={{ display: 'flex', gap: '4px', overflow: 'hidden' }}>
-            {TABS.map(([v, l]) => <button key={v} onClick={() => switchView(v)} style={{
-              padding: '5px 10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, lineHeight: 1.4, whiteSpace: 'nowrap', fontFamily: 'Inter,sans-serif',
-              background: view === v ? '#eef2ff' : 'none',
-              color: view === v ? '#4f46e5' : '#64748b',
-              fontWeight: view === v ? 600 : 500,
-            }}>{l}</button>)}
+
+          {/* macOS / Apple-style Segmented Nav Controls */}
+          <div style={{
+            display: 'flex',
+            background: '#f1f5f9',
+            padding: '4px',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+            flexShrink: 0
+          }}>
+            {TABS.map(([v, l, count]) => {
+              const isActive = view === v;
+              return (
+                <button
+                  key={v}
+                  onClick={() => switchView(v)}
+                  style={{
+                    padding: '6px 12px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '12.5px',
+                    fontWeight: isActive ? 700 : 500,
+                    lineHeight: 1.4,
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'Inter,sans-serif',
+                    background: isActive ? '#fff' : 'transparent',
+                    color: isActive ? '#4f46e5' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: isActive ? '0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)' : 'none'
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) e.currentTarget.style.color = '#0f172a';
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  {l}
+                  {count !== null && (
+                    <span style={{
+                      background: isActive ? '#eef2ff' : '#e2e8f0',
+                      color: isActive ? '#4f46e5' : '#475569',
+                      borderRadius: '99px',
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      fontVariantNumeric: 'tabular-nums',
+                      transition: 'all 0.18s'
+                    }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <div style={{ flex: 1 }}></div>
+
+          {/* Action buttons and Minimalist Close triggers */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <button onClick={() => setSettings(s => ({ ...s, hideRightSidebar: !s.hideRightSidebar }))}
-              title={settings.hideRightSidebar ? "Show Right Sidebar" : "Hide Right Sidebar"}
-              style={{ display: 'none', padding: '8px 10px', background: "#fff", color: settings.hideRightSidebar ? '#4f46e5' : '#64748b', border: '1.5px solid #e2e8f0', borderRadius: '7px', cursor: 'pointer', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1 }}>◫</span>
-            </button>
-            {view === 'contacts' && (
-              <button onClick={handleSyncSidebar} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: "#fff", color: '#4f46e5', border: '1.5px solid #e2e8f0', borderRadius: '7px', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '11.5px', fontWeight: 600 }}>
-                <span style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1 }}>⟳</span>
-                Sync Sidebar
+            {addBtn && (
+              <button
+                onClick={addBtn.action}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '8px 16px',
+                  background: "linear-gradient(135deg, #4f46e5, #4338ca)",
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontFamily: 'Inter,sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 2px 6px rgba(79,70,229,0.15)'
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+                onMouseLeave={e => e.currentTarget.style.opacity = 1}
+              >
+                {addBtn.label}
               </button>
             )}
-            {addBtn && <button onClick={addBtn.action} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 16px', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '12.5px', fontWeight: 600 }}>{addBtn.label}</button>}
-            <button onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'inline-flex', 'important'); } }}
-              style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s', marginLeft: '4px' }}>
-              <span style={{ fontSize: '16px', fontWeight: 700, lineHeight: 1 }}>✕</span>
+            <button
+              onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'inline-flex', 'important'); } }}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                background: '#fff',
+                color: '#64748b',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease',
+                marginLeft: '4px'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#fca5a5';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.background = '#fef2f2';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.color = '#64748b';
+                e.currentTarget.style.background = '#fff';
+              }}
+            >
+              <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
             </button>
-          </div>
-        </div>
-
-        {/* ── Stats bar ── */}
-        <div style={{ flexShrink: 0, display: 'flex', background: '#fff', borderBottom: `1px solid #e2e8f0` }}>
-          {[[contacts.length, 'Contacts'], [active, 'Active / VIP'], [lists.length, 'Lists'], [campaigns.length, 'Campaigns']].map(([n, l], i) => (
-            <div key={i} style={{ flex: 1, padding: '12px 20px', borderRight: '1px solid #e2e8f0' }}>
-              <span style={{ display: 'block', fontSize: '22px', fontWeight: 700, color: '#0f172a', lineHeight: '1.1', fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter,sans-serif' }}>{n}</span>
-              <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginTop: '10px', fontFamily: 'Inter,sans-serif' }}>{l}</span>
-            </div>))}
-          <div style={{ flex: 1, padding: '12px 20px' }}>
-            <span style={{ display: 'block', fontSize: '22px', fontWeight: 700, color: '#0f172a', lineHeight: '1.1', fontFamily: 'Inter,sans-serif' }}>{allTagsList.length}</span>
-            <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginTop: '10px', fontFamily: 'Inter,sans-serif' }}>Tags</span>
           </div>
         </div>
 
@@ -795,7 +881,7 @@ export function App({ togBtn }) {
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
         </div>
       </div>
 
