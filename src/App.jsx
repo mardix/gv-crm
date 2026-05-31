@@ -19,7 +19,7 @@ export function App({ togBtn }) {
   const [lists, setLists] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [forms, setForms] = useState([]);
-  const [settings, setSettings] = useState({ contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Reached Out', 'Confirmed', 'Declined'], delayMin: 15, delayMax: 45 });
+  const [settings, setSettings] = useState({ contactStatuses: ['Lead', 'Prospect', 'Active', 'VIP', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Reached Out', 'Confirmed', 'Declined'], delayMin: 15, delayMax: 45, gsheetUrl: '', gsheetAuto: false });
 
   // Filters & sort
   const [activeCampaignStatus, setActiveCampaignStatus] = useState(null);
@@ -61,6 +61,108 @@ export function App({ togBtn }) {
         else if (res && res.ok) alert('Webhook successfully triggered!');
       }
     });
+  }
+
+  function sendGSheetAction(action, payload, method = 'POST') {
+    if (!settings.gsheetUrl) return Promise.resolve({ ok: false, error: 'No GSheet URL' });
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        action: 'gsheetAction',
+        url: settings.gsheetUrl,
+        method,
+        payload: { action, ...payload }
+      }, (res) => resolve(res || { ok: false, error: 'No response' }));
+    });
+  }
+
+  function mapContactToGSheet(c) {
+    const s = (c.status || '').toLowerCase();
+    let gsStatus = 'Review';
+    if (s === 'active' || s === 'vip') gsStatus = 'Active';
+    else if (s === 'inactive') gsStatus = 'Inactive';
+    else if (s === 'banned') gsStatus = 'Banned';
+
+    return {
+      contactId: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      status: gsStatus,
+      category: (s === 'vip' || c.tags?.some(t => t.toLowerCase() === 'vip')) ? 'VIP' : 'Regular',
+      membershipStatus: gsStatus,
+      membershipLevel: 'Basic',
+      location: [c.city, c.state, c.location].filter(Boolean).join(', '),
+      handle: c.handle,
+      note: c.comment,
+      assignedLists: (c.lists || []).map(l => ({ listId: l.listId, status: l.status || 'Prospect' }))
+    };
+  }
+
+  async function gsheetSaveContacts(cs, chunkSize = 300) {
+    if (!settings.gsheetUrl || !cs.length) return { ok: true };
+    const mapped = cs.map(mapContactToGSheet);
+    let totalSent = 0;
+
+    for (let i = 0; i < mapped.length; i += chunkSize) {
+      const chunk = mapped.slice(i, i + chunkSize);
+      console.log(`Syncing chunk ${i / chunkSize + 1} (${chunk.length} contacts)...`);
+      const res = await sendGSheetAction('saveContacts', { contacts: chunk });
+      if (!res.ok) {
+        console.error('Bulk sync failed at chunk:', i, res.error);
+        return res;
+      }
+      totalSent += chunk.length;
+    }
+    return { ok: true, total: totalSent };
+  }
+
+  async function gsheetSaveContact(c) {
+    return gsheetSaveContacts([c]);
+  }
+
+  async function gsheetSaveContactLists(ls, chunkSize = 100) {
+    if (!settings.gsheetUrl || !ls.length) return { ok: true };
+    const mapped = ls.map(l => ({
+      listId: l.id,
+      name: l.name,
+      description: l.description || '',
+      status: 'Active'
+    }));
+
+    let totalSent = 0;
+    for (let i = 0; i < mapped.length; i += chunkSize) {
+      const chunk = mapped.slice(i, i + chunkSize);
+      const res = await sendGSheetAction('saveContactLists', { lists: chunk });
+      if (!res.ok) return res;
+      totalSent += chunk.length;
+    }
+    return { ok: true, total: totalSent };
+  }
+
+  async function gsheetSaveList(l) {
+    return gsheetSaveContactLists([l]);
+  }
+
+  async function gsheetDeleteList(id) {
+    if (!settings.gsheetUrl) return;
+    await sendGSheetAction('deleteContactList', { listId: id });
+  }
+
+  async function handleManualGSheetSync() {
+    if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
+    const ok = confirm('Trigger a full sync to Google Sheets? This will push all lists and all contacts. Large datasets will be synced in chunks.');
+    if (!ok) return;
+
+    try {
+      // 1. Sync Lists (Bulk)
+      await gsheetSaveContactLists(lists);
+      // 2. Sync Contacts (Bulk with chunking)
+      const res = await gsheetSaveContacts(contacts, 100);
+      if (res.ok) alert(`✓ Full sync completed: Pushed ${lists.length} lists and ${contacts.length} contacts.`);
+      else alert('Sync partially failed: ' + (res.error || 'Unknown error'));
+    } catch (err) {
+      alert('GSheet Sync Error: ' + err.message);
+    }
   }
 
   useEffect(() => {
@@ -146,20 +248,20 @@ export function App({ togBtn }) {
   function handleImport(rows, onResult, selectedListIds = []) {
     let imp = 0, upd = 0;
     const newContacts = [...contacts];
-    
+
     rows.forEach(row => {
       // Find the first value in the row if headers like 'phone' don't explicitly exist (for unstructured CSV/pasted lists)
       const rawPhone = String(row.phone || Object.values(row)[0] || '').trim();
       const phoneDigits = rawPhone.replace(/\D/g, '');
       const email = String(row.email || '').trim().toLowerCase();
       let name = String(row.name || '').trim();
-      
+
       if (!phoneDigits && !email) return; // Skip entirely empty rows
       if (!name) name = rawPhone;
 
       // Check if contact already exists
-      const existingIdx = newContacts.findIndex(c => 
-        (phoneDigits && c.phone && c.phone.replace(/\D/g, '') === phoneDigits) || 
+      const existingIdx = newContacts.findIndex(c =>
+        (phoneDigits && c.phone && c.phone.replace(/\D/g, '') === phoneDigits) ||
         (email && c.email && c.email.toLowerCase() === email)
       );
 
@@ -170,7 +272,7 @@ export function App({ togBtn }) {
         const existingContact = newContacts[existingIdx];
         const existingListIds = (existingContact.lists || []).map(l => l.listId);
         const listsToAdd = targetLists.filter(tl => !existingListIds.includes(tl.listId));
-        
+
         if (listsToAdd.length > 0) {
           newContacts[existingIdx] = {
             ...existingContact,
@@ -181,19 +283,19 @@ export function App({ togBtn }) {
         }
       } else {
         // Create brand new contact
-        newContacts.push({ 
-          id: uid(), 
-          name, 
-          phone: formatPhone(rawPhone), 
-          email, 
-          handle: String(row.handle || '').trim(), 
-          city: String(row.city || '').trim(), 
-          state: String(row.state || '').trim(), 
-          location: String(row.location || '').trim(), 
-          status: String(row.status || '').trim(), 
-          tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean), 
-          comment: String(row.comment || '').trim(), 
-          lists: targetLists 
+        newContacts.push({
+          id: uid(),
+          name,
+          phone: formatPhone(rawPhone),
+          email,
+          handle: String(row.handle || '').trim(),
+          city: String(row.city || '').trim(),
+          state: String(row.state || '').trim(),
+          location: String(row.location || '').trim(),
+          status: String(row.status || '').trim(),
+          tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean),
+          comment: String(row.comment || '').trim(),
+          lists: targetLists
         });
         imp++;
       }
@@ -283,10 +385,10 @@ export function App({ togBtn }) {
 
   const addBtn =
     view === 'contacts' ? { label: '+ New Contact', action: () => setContactModal('new') }
-    : view === 'lists' ? { label: '+ New List', action: () => setListModal('new') }
-    : view === 'forms' ? { label: '+ New Form', action: () => setFormModal('new') }
-    : view === 'campaigns' ? { label: '+ New Campaign', action: () => setCampaignModal('new') }
-    : null;
+      : view === 'lists' ? { label: '+ New List', action: () => setListModal('new') }
+        : view === 'forms' ? { label: '+ New Form', action: () => setFormModal('new') }
+          : view === 'campaigns' ? { label: '+ New Campaign', action: () => setCampaignModal('new') }
+            : null;
 
   function handleDownloadState() {
     const payload = JSON.stringify({ contacts, lists, campaigns, forms, settings }, null, 2);
@@ -474,7 +576,7 @@ export function App({ togBtn }) {
             {view === 'contacts' && (
               <>
                 {[['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
-                ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => ({ id: l.id, label: l.name }))],
+                ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
                 ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
                 ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
                 ].map(([placeholder, setter, val, opts], i) => (
@@ -538,7 +640,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Add to List…</option>
-                    {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   {/* Remove from List */}
@@ -548,7 +650,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Remove from List…</option>
-                    {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   <button onClick={() => {
@@ -564,23 +666,29 @@ export function App({ togBtn }) {
               )}
             </div>
           )}
-          {view === 'lists' && <ListsView lists={lists} contacts={contacts} settings={settings} search={search} onEdit={l => setListModal(l)} onDelete={id => { if (confirm('Delete list?')) { setLists(ls => ls.filter(l => l.id !== id)); setContacts(cs => cs.map(c => ({ ...c, lists: (c.lists || []).filter(e => e.listId !== id) }))); } }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
+          {view === 'lists' && <ListsView lists={lists} contacts={contacts} settings={settings} search={search} onEdit={l => setListModal(l)} onDelete={id => {
+            if (confirm('Delete list?')) {
+              setLists(ls => ls.filter(l => l.id !== id));
+              setContacts(cs => cs.map(c => ({ ...c, lists: (c.lists || []).filter(e => e.listId !== id) })));
+              if (settings.gsheetAuto) gsheetDeleteList(id);
+            }
+          }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
           {view === 'campaigns' && (
             <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
               <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) setCampaigns(cs => cs.filter(c => c.id !== id)); }} onDuplicate={handleDuplicateCampaign} />
             </div>
           )}
           {view === 'forms' && (
-            <FormsView 
-              forms={forms} 
+            <FormsView
+              forms={forms}
               editingForm={formModal}
-              onEdit={f => setFormModal(f)} 
-              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); } }} 
+              onEdit={f => setFormModal(f)}
+              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); } }}
               onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); setFormModal(null); }}
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleManualGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
         </div>
       </div>
 
@@ -588,14 +696,27 @@ export function App({ togBtn }) {
       {contactModal && <ContactModal
         contact={contactModal === 'new' ? null : contactModal}
         lists={lists} settings={settings}
-        onSave={c => { c.phone = formatPhone(c.phone); setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); setContactModal(null); }}
-        onDelete={id => { setContacts(cs => cs.filter(c => c.id !== id)); setContactModal(null); }}
+        onSave={c => {
+          c.phone = formatPhone(c.phone);
+          setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; });
+          setContactModal(null);
+          if (settings.gsheetAuto) gsheetSaveContact(c);
+        }}
+        onDelete={id => {
+          setContacts(cs => cs.filter(c => c.id !== id));
+          setContactModal(null);
+          // Note: Spec doesn't have delete contact, maybe just leave it
+        }}
         onClose={() => setContactModal(null)}
       />}
 
       {listModal && <ListModal
         list={listModal === 'new' ? null : listModal}
-        onSave={l => { setLists(ls => { const i = ls.findIndex(x => x.id === l.id); return i >= 0 ? ls.map((x, j) => j === i ? l : x) : [l, ...ls]; }); setListModal(null); }}
+        onSave={l => {
+          setLists(ls => { const i = ls.findIndex(x => x.id === l.id); return i >= 0 ? ls.map((x, j) => j === i ? l : x) : [l, ...ls]; });
+          setListModal(null);
+          if (settings.gsheetAuto) gsheetSaveList(l);
+        }}
         onClose={() => setListModal(null)}
       />}
       {campaignModal && <CampaignModal

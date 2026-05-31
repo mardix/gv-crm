@@ -244,6 +244,7 @@ function FormEditor({ form, onSave, onClose }) {
                         <option value="handle">Handle / Username</option>
                         <option value="city">City</option>
                         <option value="state">State</option>
+                        <option value="id">Contact ID</option>
                       </select>
                     </div>
 

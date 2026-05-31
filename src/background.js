@@ -165,17 +165,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.action === 'gsheetAction') {
+    const { url, payload, method = 'POST' } = msg;
+    const options = {
+      method,
+      headers: { 'Content-Type': 'text/plain' }
+    };
+    
+    let finalUrl = url;
+    if (method === 'POST') {
+      options.body = JSON.stringify(payload);
+    } else if (method === 'GET' && payload) {
+      const params = new URLSearchParams(payload).toString();
+      finalUrl += (finalUrl.includes('?') ? '&' : '?') + params;
+    }
+
+    fetch(finalUrl, options)
+      .then(res => res.text().then(text => {
+        try { return JSON.parse(text); }
+        catch (e) { return { ok: false, error: 'Invalid JSON response from server', text }; }
+      }))
+      .then(json => {
+        console.log('GSheet Proxy Response:', json);
+        sendResponse(json);
+      })
+      .catch(e => {
+        console.error('GSheet Proxy Error:', e);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true;
+  }
+
   if (msg.action === 'sendFormSubmission') {
     const { url, payload } = msg;
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      //headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-      .then(res => res.ok ? { ok: true, res } : { error: 'HTTP ' + res.status })
-      .then(sendResponse)
-      .catch(e => sendResponse({ error: e.message }));
+      .then(res => res.text().then(text => {
+        try { return JSON.parse(text); }
+        catch (e) { return { ok: false, error: 'Invalid JSON response from server', text }; }
+      }))
+      .then(json => sendResponse(json))
+      .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 });

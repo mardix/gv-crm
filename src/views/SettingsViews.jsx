@@ -200,7 +200,7 @@ function PresetTextsEditor({ settings, onUpdate }) {
   );
 }
 
-export function SettingsView({ settings, onUpdate, onManualWebhook, contacts, lists, onImport, onDownloadState, onLoadState }) {
+export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState }) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ padding: '32px 28px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '720px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
@@ -275,6 +275,39 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, contacts, li
             <div style={{ borderTop: '1.5px solid #f1f1f7', margin: '14px -28px -28px', padding: '24px 28px 24px' }}>
               <button onClick={onManualWebhook} style={{ width: '100%', padding: '14px 0', background: "#0f172a", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
                 🚀 Send Payload Manually
+              </button>
+            </div>
+          </div>
+        </IOCard>
+
+        <IOCard title="Google Sheets Backend" desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Apps Script Web App URL</label>
+              <input type="text" placeholder="https://script.google.com/macros/s/.../exec" value={settings.gsheetUrl || ''} onInput={e => onUpdate('gsheetUrl', e.target.value)}
+                style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #eef0f5`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
+                onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
+                onBlur={e => { e.target.style.borderColor = "#eef0f5"; e.target.style.boxShadow = 'none'; }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '14.5px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync Individual Updates</div>
+                <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Push contacts and lists to Google Sheets the moment they are saved.</div>
+              </div>
+              <button onClick={() => onUpdate('gsheetAuto', !settings.gsheetAuto)} style={{
+                width: '46px', height: '24px', borderRadius: '12px', background: settings.gsheetAuto ? '#4f46e5' : '#e2e8f0',
+                border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
+              }}>
+                <div style={{
+                  width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: '3px', left: settings.gsheetAuto ? '25px' : '3px',
+                  transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                }}></div>
+              </button>
+            </div>
+            <div style={{ borderTop: '1.5px solid #f1f1f7', margin: '14px -28px -28px', padding: '24px 28px 24px' }}>
+              <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#22c55e", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
+                📊 Full Sync to Google Sheets
               </button>
             </div>
           </div>
