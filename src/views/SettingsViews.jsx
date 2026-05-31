@@ -26,40 +26,40 @@ function StatusEditor({ title, desc, statusKey, settings, onUpdate }) {
         </div>
         <span style={{ fontSize: '18px', color: '#94a3b8', transition: 'transform 0.2s', display: 'inline-block', transform: panelOpen ? 'rotate(0deg)' : 'rotate(-90deg)', flexShrink: 0 }}>▾</span>
       </div>
-      
+
       {panelOpen && (
         <>
           <div style={{ padding: '8px 0' }}>
-        {statuses.map((st, i) => {
-          const [bg, fg] = palFor(st, statuses);
-          return (
-            <div key={st} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 28px', borderBottom: i < statuses.length - 1 ? `1px solid #f8f9fb` : 'none' }}>
-              <span style={{ color: "#cbd5e1", cursor: 'grab', fontSize: '18px', letterSpacing: '-2px', userSelect: 'none', fontWeight: 800 }}>⋮⋮</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 700, background: bg, color: fg, minWidth: '100px', justifyContent: 'center', whiteSpace: 'nowrap', border: `1.5px solid ${fg}22` }}>{st}</span>
-              <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                {i > 0 && <Btn variant="sm" onClick={() => move(i, -1)} style={{ padding: '7px 12px', background: '#f8fafc' }}>↑</Btn>}
-                {i > 0 || <div style={{ width: '40px' }}></div>}
-                {i < statuses.length - 1 && <Btn variant="sm" onClick={() => move(i, 1)} style={{ padding: '7px 12px', background: '#f8fafc' }}>↓</Btn>}
-                {i < statuses.length - 1 || <div style={{ width: '40px' }}></div>}
-                <Btn variant="sm" onClick={() => { if (confirm(`Remove "${st}"?`)) onUpdate(statusKey, statuses.filter((_, j) => j !== i)); }} style={{ color: "#ef4444", border: 'none', padding: '7px 12px', background: '#fff1f2' }}>✕</Btn>
-              </div>
+            {statuses.map((st, i) => {
+              const [bg, fg] = palFor(st, statuses);
+              return (
+                <div key={st} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 28px', borderBottom: i < statuses.length - 1 ? `1px solid #f8f9fb` : 'none' }}>
+                  <span style={{ color: "#cbd5e1", cursor: 'grab', fontSize: '18px', letterSpacing: '-2px', userSelect: 'none', fontWeight: 800 }}>⋮⋮</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 700, background: bg, color: fg, minWidth: '100px', justifyContent: 'center', whiteSpace: 'nowrap', border: `1.5px solid ${fg}22` }}>{st}</span>
+                  <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                    {i > 0 && <Btn variant="sm" onClick={() => move(i, -1)} style={{ padding: '7px 12px', background: '#f8fafc' }}>↑</Btn>}
+                    {i > 0 || <div style={{ width: '40px' }}></div>}
+                    {i < statuses.length - 1 && <Btn variant="sm" onClick={() => move(i, 1)} style={{ padding: '7px 12px', background: '#f8fafc' }}>↓</Btn>}
+                    {i < statuses.length - 1 || <div style={{ width: '40px' }}></div>}
+                    <Btn variant="sm" onClick={() => { if (confirm(`Remove "${st}"?`)) onUpdate(statusKey, statuses.filter((_, j) => j !== i)); }} style={{ color: "#ef4444", border: 'none', padding: '7px 12px', background: '#fff1f2' }}>✕</Btn>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ padding: '20px 28px', borderTop: `1.5px solid #f1f1f7`, background: "#fcfdff" }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <input value={inp} placeholder="Add new status..." onInput={e => setInp(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && inp.trim()) { if (statuses.includes(inp.trim())) { alert('Already exists'); return; } onUpdate(statusKey, [...statuses, inp.trim()]); setInp(''); } }}
+                style={{ flex: 1, minWidth: 0, padding: '12px 18px', border: `2px solid #eef0f5`, borderRadius: '12px', fontSize: '14px', color: "#1e293b", outline: 'none', background: '#fff', transition: 'all 0.15s' }}
+                onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
+                onBlur={e => { e.target.style.borderColor = "#eef0f5"; e.target.style.boxShadow = 'none'; }}
+              />
+              <button onClick={() => { if (!inp.trim()) return; if (statuses.includes(inp.trim())) { alert('Already exists'); return; } onUpdate(statusKey, [...statuses, inp.trim()]); setInp(''); }}
+                style={{ flexShrink: 0, padding: '12px 24px', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'filter 0.2s' }}>Add</button>
             </div>
-          );
-        })}
-      </div>
-      <div style={{ padding: '20px 28px', borderTop: `1.5px solid #f1f1f7`, background: "#fcfdff" }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <input value={inp} placeholder="Add new status..." onInput={e => setInp(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && inp.trim()) { if (statuses.includes(inp.trim())) { alert('Already exists'); return; } onUpdate(statusKey, [...statuses, inp.trim()]); setInp(''); } }}
-            style={{ flex: 1, minWidth: 0, padding: '12px 18px', border: `2px solid #eef0f5`, borderRadius: '12px', fontSize: '14px', color: "#1e293b", outline: 'none', background: '#fff', transition: 'all 0.15s' }}
-            onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
-            onBlur={e => { e.target.style.borderColor = "#eef0f5"; e.target.style.boxShadow = 'none'; }}
-          />
-          <button onClick={() => { if (!inp.trim()) return; if (statuses.includes(inp.trim())) { alert('Already exists'); return; } onUpdate(statusKey, [...statuses, inp.trim()]); setInp(''); }}
-            style={{ flexShrink: 0, padding: '12px 24px', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'filter 0.2s' }}>Add</button>
-        </div>
-      </div>
-      </>
+          </div>
+        </>
       )}
     </div>
   );
@@ -226,6 +226,7 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
           </div>
         </IOCard>
 
+
         <IOCard title="Campaign Pacing" desc="Configure global randomized delay limits strictly applied to automated messaging to avoid spam flags.">
           <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
@@ -240,6 +241,43 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
             </div>
           </div>
         </IOCard>
+
+        <hr />
+        <IOCard title="GSheet CRM Sync" desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Apps Script Web App URL</label>
+              <input type="text" placeholder="https://script.google.com/macros/s/.../exec" value={settings.gsheetUrl || ''} onInput={e => onUpdate('gsheetUrl', e.target.value)}
+                style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #eef0f5`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
+                onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
+                onBlur={e => { e.target.style.borderColor = "#eef0f5"; e.target.style.boxShadow = 'none'; }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '14.5px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync Individual Updates</div>
+                <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Push contacts and lists to Google Sheets the moment they are saved.</div>
+              </div>
+              <button onClick={() => onUpdate('gsheetAuto', !settings.gsheetAuto)} style={{
+                width: '46px', height: '24px', borderRadius: '12px', background: settings.gsheetAuto ? '#4f46e5' : '#e2e8f0',
+                border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
+              }}>
+                <div style={{
+                  width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: '3px', left: settings.gsheetAuto ? '25px' : '3px',
+                  transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                }}></div>
+              </button>
+            </div>
+            <div style={{ borderTop: '1.5px solid #f1f1f7', margin: '14px -28px -28px', padding: '24px 28px 24px' }}>
+              <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
+                🔄 Full Sync with Google Sheets
+              </button>
+            </div>
+          </div>
+        </IOCard>
+        <hr />
+        <IOView contacts={contacts} lists={lists} onImport={onImport} onDownloadState={onDownloadState} onLoadState={onLoadState} />
+
         <IOCard title="Webhook Integration" desc="Synchronize your workspace state securely to an external URL. Method is always POST.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
@@ -279,40 +317,6 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
             </div>
           </div>
         </IOCard>
-
-        <IOCard title="Google Sheets Backend" desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Apps Script Web App URL</label>
-              <input type="text" placeholder="https://script.google.com/macros/s/.../exec" value={settings.gsheetUrl || ''} onInput={e => onUpdate('gsheetUrl', e.target.value)}
-                style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #eef0f5`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
-                onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
-                onBlur={e => { e.target.style.borderColor = "#eef0f5"; e.target.style.boxShadow = 'none'; }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14.5px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync Individual Updates</div>
-                <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Push contacts and lists to Google Sheets the moment they are saved.</div>
-              </div>
-              <button onClick={() => onUpdate('gsheetAuto', !settings.gsheetAuto)} style={{
-                width: '46px', height: '24px', borderRadius: '12px', background: settings.gsheetAuto ? '#4f46e5' : '#e2e8f0',
-                border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
-              }}>
-                <div style={{
-                  width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
-                  position: 'absolute', top: '3px', left: settings.gsheetAuto ? '25px' : '3px',
-                  transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
-                }}></div>
-              </button>
-            </div>
-            <div style={{ borderTop: '1.5px solid #f1f1f7', margin: '14px -28px -28px', padding: '24px 28px 24px' }}>
-              <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
-                🔄 Full Sync with Google Sheets
-              </button>
-            </div>
-          </div>
-        </IOCard>
-        <IOView contacts={contacts} lists={lists} onImport={onImport} onDownloadState={onDownloadState} onLoadState={onLoadState} />
       </div>
     </div>
   );
@@ -402,25 +406,25 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
 
     let headers;
     let dataLines;
-    
+
     if (hasHeaders) {
       headers = firstLineFields;
       dataLines = lines.slice(1);
     } else {
-      headers = ['phone']; 
+      headers = ['phone'];
       dataLines = lines;
     }
 
-    return dataLines.filter(l => l.trim()).map(line => { 
-      const vals = parseLine(line); 
-      const obj = {}; 
+    return dataLines.filter(l => l.trim()).map(line => {
+      const vals = parseLine(line);
+      const obj = {};
       if (!hasHeaders) {
         obj.phone = vals[0] ?? '';
         if (vals[1]) obj.name = vals[1];
       } else {
-        headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; }); 
+        headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
       }
-      return obj; 
+      return obj;
     });
   }
 
@@ -465,7 +469,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: '8px' }}>Select data sources</label>
             <select value={scope} onChange={e => setScope(e.target.value)} style={{ display: 'block', width: '100%', padding: '11px 36px 11px 15px', border: `1.5px solid #e2e8f0`, borderRadius: '9px', fontSize: '14px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', background: `#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center`, transition: 'all 0.15s ease' }}>
               <option value="all">All contacts ({contacts.length})</option>
-              {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric: true})).map(l => <option key={l.id} value={l.id}>{l.name} ({contacts.filter(c => (c.lists || []).some(e => e.listId === l.id)).length})</option>)}
+              {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name} ({contacts.filter(c => (c.lists || []).some(e => e.listId === l.id)).length})</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -486,7 +490,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
               1. Add to Lists (Optional)
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric: true})).map(l => {
+              {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => {
                 const sel = selectedListIds.includes(l.id);
                 return (
                   <button key={l.id} onClick={() => setSelectedListIds(p => sel ? p.filter(x => x !== l.id) : [...p, l.id])}
@@ -536,19 +540,19 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
           </div>
 
           {resMsg && <div style={{ padding: '16px 20px', borderRadius: '12px', fontSize: '13.5px', lineHeight: 1.6, fontWeight: 500, background: resMsg.type === 'ok' ? '#ecfdf5' : resMsg.type === 'warn' ? '#fffbeb' : '#fef2f2', color: resMsg.type === 'ok' ? '#065f46' : resMsg.type === 'warn' ? '#92400e' : '#991b1b', border: `1.5px solid ${resMsg.type === 'ok' ? '#34d399' : resMsg.type === 'warn' ? '#fbbf24' : '#f87171'}` }}>{resMsg.text}</div>}
-          
+
           <details style={{ background: '#fdfdff', borderRadius: '12px', overflow: 'hidden', border: '1.5px solid #eef0f5' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 700, color: "#475569", padding: '16px 20px', userSelect: 'none', fontSize: '13px', background: '#f8fafc' }}>Format Reference</summary>
             <div style={{ padding: '0 20px 20px', background: '#f8fafc' }}>
               <div style={{ fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>Option A: Just a list of numbers</div>
               <div style={{ background: '#fff', borderRadius: '8px', padding: '14px 16px', border: '1.5px solid #e2e8f0', fontFamily: '"DM Mono",monospace', fontSize: '12px', color: "#0f172a", lineHeight: 1.5, marginBottom: '16px' }}>
-                555-123-4567<br/>
-                8009991111<br/>
+                555-123-4567<br />
+                8009991111<br />
                 (415) 555-0000
               </div>
               <div style={{ fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>Option B: CSV with full headers</div>
               <div style={{ background: '#fff', borderRadius: '8px', padding: '14px 16px', border: '1.5px solid #e2e8f0', fontFamily: '"DM Mono",monospace', fontSize: '12px', color: "#0f172a", lineHeight: 1.8, overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                name,phone,email,handle,city,state,location,status,tags,comment<br/>
+                name,phone,email,handle,city,state,location,status,tags,comment<br />
                 John Doe,555-0100,john@example.com,,,CA,,,,
               </div>
             </div>
