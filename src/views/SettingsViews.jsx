@@ -200,7 +200,7 @@ function PresetTextsEditor({ settings, onUpdate }) {
   );
 }
 
-export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState }) {
+export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore }) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ padding: '32px 28px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '720px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
@@ -276,7 +276,7 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
           </div>
         </IOCard>
         <hr />
-        <IOView contacts={contacts} lists={lists} onImport={onImport} onDownloadState={onDownloadState} onLoadState={onLoadState} />
+        <IOView contacts={contacts} lists={lists} onImport={onImport} onDownloadState={onDownloadState} onLoadState={onLoadState} onGSheetBackup={onGSheetBackup} onGSheetRestore={onGSheetRestore} gsheetUrl={settings.gsheetUrl} />
 
         <IOCard title="Webhook Integration" desc="Synchronize your workspace state securely to an external URL. Method is always POST.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -344,11 +344,19 @@ function IOCard({ title, desc, children }) {
   );
 }
 
-export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState }) {
+export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, gsheetUrl }) {
   const [scope, setScope] = useState('all');
   const [resMsg, setResMsg] = useState(null);
   const [rawText, setRawText] = useState('');
   const [selectedListIds, setSelectedListIds] = useState([]);
+
+  const [gsheetBackupId, setGsheetBackupId] = useState('');
+  const [inputSnapshotId, setInputSnapshotId] = useState('');
+  const [gsheetBackupLoading, setGsheetBackupLoading] = useState(false);
+  const [gsheetRestoreLoading, setGsheetRestoreLoading] = useState(false);
+  const [gsheetBackupError, setGsheetBackupError] = useState('');
+  const [gsheetRestoreError, setGsheetRestoreError] = useState('');
+  const [gsheetCopied, setGsheetCopied] = useState(false);
 
   const n = scope === 'all' ? contacts.length : contacts.filter(c => (c.lists || []).some(e => e.listId === scope)).length;
 
@@ -440,6 +448,182 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
     <>
       {ioCard('💾 State Backup & Restore', 'Download your entire workspace state (contacts, lists, campaigns, settings) as JSON, or restore from a previous backup.', (
         <>
+          <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e', lineHeight: 1.6, fontWeight: 500 }}>
+            ⚠️ <strong>Loading a state JSON will overwrite your current workspace data.</strong> Make sure to download a backup first.
+          </div>
+
+          {!gsheetUrl ? (
+            <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
+              ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under "GSheet CRM Sync" above to enable cloud backup and restore.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
+                <div style={{ flex: 1, height: '1.5px', background: 'linear-gradient(90deg, rgba(79,70,229,0.05), #e2e8f0, rgba(79,70,229,0.05))' }}></div>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Google Sheets Backup</span>
+                <div style={{ flex: 1, height: '1.5px', background: 'linear-gradient(90deg, rgba(79,70,229,0.05), #e2e8f0, rgba(79,70,229,0.05))' }}></div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                <div>
+                  <button
+                    disabled={gsheetBackupLoading}
+                    onClick={() => {
+                      setGsheetBackupLoading(true);
+                      setGsheetBackupError('');
+                      setGsheetBackupId('');
+                      onGSheetBackup(
+                        (id) => {
+                          setGsheetBackupLoading(false);
+                          setGsheetBackupId(id);
+                        },
+                        (err) => {
+                          setGsheetBackupLoading(false);
+                          setGsheetBackupError(err);
+                        }
+                      );
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '14px 0',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: gsheetBackupLoading ? '#a7f3d0' : 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      cursor: gsheetBackupLoading ? 'default' : 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 4px rgba(16,185,129,0.1)'
+                    }}
+                  >
+                    {gsheetBackupLoading ? '☁ Saving Snapshot to Google Sheets...' : '☁ Backup State to Google Sheets'}
+                  </button>
+
+                  {gsheetBackupError && (
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                      ❌ Backup Failed: {gsheetBackupError}
+                    </div>
+                  )}
+
+                  {gsheetBackupId && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '14px 16px',
+                      background: '#f0fdf4',
+                      borderRadius: '10px',
+                      border: '1.5px dashed #86efac',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>✅</span> GSheet Backup Successful!
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Snapshot ID:</span>
+                        <code style={{ fontSize: '12.5px', color: '#15803d', fontWeight: 700, fontFamily: '"DM Mono",monospace', flex: 1 }}>{gsheetBackupId}</code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(gsheetBackupId);
+                            setGsheetCopied(true);
+                            setTimeout(() => setGsheetCopied(false), 2000);
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            background: gsheetCopied ? '#15803d' : '#f0fdf4',
+                            color: gsheetCopied ? '#fff' : '#15803d',
+                            border: '1px solid #86efac',
+                            borderRadius: '5px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {gsheetCopied ? 'Copied! ✓' : 'Copy'}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#166534', opacity: 0.8, lineHeight: 1.4 }}>
+                        Write down or copy this ID. You can enter this ID below on any device to restore this exact workspace snapshot.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px' }}>
+                    Restore from Google Sheets Snapshot
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Paste Snapshot ID (e.g. APPSTATE-2026-05-31)"
+                      value={inputSnapshotId}
+                      onInput={e => setInputSnapshotId(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        outline: 'none',
+                        fontFamily: '"DM Mono",monospace',
+                        background: '#fff',
+                        color: '#0f172a'
+                      }}
+                      onFocus={e => { e.target.style.borderColor = "#4f46e5"; }}
+                      onBlur={e => { e.target.style.borderColor = "#cbd5e1"; }}
+                    />
+                    <button
+                      disabled={gsheetRestoreLoading || !inputSnapshotId.trim()}
+                      onClick={() => {
+                        setGsheetRestoreLoading(true);
+                        setGsheetRestoreError('');
+                        onGSheetRestore(
+                          inputSnapshotId,
+                          () => {
+                            setGsheetRestoreLoading(false);
+                            setInputSnapshotId('');
+                          },
+                          (err) => {
+                            setGsheetRestoreLoading(false);
+                            setGsheetRestoreError(err);
+                          }
+                        );
+                      }}
+                      style={{
+                        padding: '0 16px',
+                        background: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? '#cbd5e1' : '#4f46e5',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? 'default' : 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {gsheetRestoreLoading ? 'Restoring...' : 'Restore'}
+                    </button>
+                  </div>
+                  {gsheetRestoreError && (
+                    <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                      ❌ Restore Failed: {gsheetRestoreError}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
+            <div style={{ flex: 1, height: '1.5px', background: 'linear-gradient(90deg, rgba(79,70,229,0.05), #e2e8f0, rgba(79,70,229,0.05))' }}></div>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Backup & Restore</span>
+            <div style={{ flex: 1, height: '1.5px', background: 'linear-gradient(90deg, rgba(79,70,229,0.05), #e2e8f0, rgba(79,70,229,0.05))' }}></div>
+          </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
               onClick={onDownloadState}
@@ -458,9 +642,9 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
               }} />
             </label>
           </div>
-          <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e', lineHeight: 1.6, fontWeight: 500 }}>
-            ⚠️ <strong>Loading a state JSON will overwrite your current workspace data.</strong> Make sure to download a backup first.
-          </div>
+
+
+
         </>
       ))}
       {ioCard('↑ Export Data', 'Download your contacts or a specific list as professional CSV or JSON files.', (

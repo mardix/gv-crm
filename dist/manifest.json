@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.jsx-loader-DabJyCJw.js"
+        "assets/main.jsx-loader-D0SeNQ-H.js"
       ],
       "matches": [
         "https://voice.google.com/*"
@@ -45,7 +45,7 @@
       "resources": [
         "icons/*",
         "assets/jsxRuntime.module-DYcKo6ph.js",
-        "assets/main.jsx-BtWFCsNL.js"
+        "assets/main.jsx-OkUQcAN5.js"
       ],
       "use_dynamic_url": false
     }

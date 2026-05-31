@@ -1,0 +1,24 @@
+I have updated the forms section to support Hidden Input fields. This new field type allows you to set a static value (or use auto-fill from contact data) that will be included in the form submission without being visible to the user filling out the form.
+
+Key Changes:
+Forms Editor (FormsView.jsx):
+
+Added "Hidden Input" as a new field type.
+When the "Hidden Input" type is selected, a new "Static Value" field appears. You can enter any constant value here that you want to send with every submission (e.g., a source ID, a campaign name, or a secret key).
+Auto-fill also works with hidden fields, allowing you to automatically pass contact details (like their CRM ID) to your webhook without cluttering the UI.
+Form Runner (ContextWidget.jsx):
+
+Updated the form runner to automatically include these hidden fields in the JSON payload sent to your endpoint.
+Hidden fields are gracefully skipped during rendering so they don't appear in the contact's dynamic form panel.
+Example Use Case:
+If you need every form submission to include source: "google-voice", you can now add a field with:
+
+Display Label: Source (only visible to you in the editor)
+Payload Key: source
+Type: Hidden Input
+Static Value: google-voice
+When the form is submitted, the JSON will automatically include "source": "google-voice".
+
+2
+FormsView.jsx
+ContextWidget.jsx

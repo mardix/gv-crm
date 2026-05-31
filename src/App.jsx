@@ -462,6 +462,65 @@ export function App({ togBtn }) {
     }
   }
 
+  async function handleGSheetBackup(onSuccess, onError) {
+    if (!settings.gsheetUrl) {
+      alert('Please enter an Apps Script URL in Settings first.');
+      return;
+    }
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const snapshotName = `APPSTATE-${todayStr}`;
+      const res = await sendGSheetAction('saveDataSnapshot', {
+        snapshotType: 'APPSTATE',
+        snapshotName,
+        snapshotMode: 'replace',
+        data: { contacts, lists, campaigns, forms, settings }
+      });
+      if (res && res.ok && res.snapshotId) {
+        onSuccess(res.snapshotId);
+      } else {
+        throw new Error(res?.error || 'Unknown error occurred during GSheet backup');
+      }
+    } catch (err) {
+      console.error(err);
+      onError(err.message);
+    }
+  }
+
+  async function handleGSheetRestore(snapshotId, onSuccess, onError) {
+    if (!settings.gsheetUrl) {
+      alert('Please enter an Apps Script URL in Settings first.');
+      return;
+    }
+    if (!snapshotId.trim()) {
+      alert('Please enter a Snapshot ID to restore.');
+      return;
+    }
+    const ok = confirm('⚠️ Are you sure you want to restore from this snapshot? This will completely overwrite your current local data (contacts, lists, campaigns, forms, settings).');
+    if (!ok) return;
+
+    try {
+      const res = await sendGSheetAction('readDataSnapshot', { snapshotId }, 'GET');
+      if (res && res.ok && res.snapshot) {
+        const payload = res.snapshot.data;
+        if (!payload || typeof payload !== 'object') throw new Error('Snapshot payload is empty or invalid');
+        
+        if (payload.contacts && Array.isArray(payload.contacts)) setContacts(payload.contacts);
+        if (payload.lists && Array.isArray(payload.lists)) setLists(payload.lists);
+        if (payload.campaigns && Array.isArray(payload.campaigns)) setCampaigns(payload.campaigns);
+        if (payload.forms && Array.isArray(payload.forms)) setForms(payload.forms);
+        if (payload.settings && typeof payload.settings === 'object') setSettings(s => ({ ...s, ...payload.settings }));
+
+        onSuccess();
+      } else {
+        throw new Error(res?.error || 'Failed to retrieve snapshot or invalid response');
+      }
+    } catch (err) {
+      console.error(err);
+      onError(err.message);
+    }
+  }
+
   function handleAddFromContext(active) {
     setContactModal({
       id: uid(),
@@ -736,7 +795,7 @@ export function App({ togBtn }) {
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} />}
         </div>
       </div>
 
