@@ -5,29 +5,171 @@ import { palFor, campaignPhones, CAMP_PAL } from '../utils/utils';
 
 export function ListsView({ lists, contacts, settings, search, onEdit, onDelete, onFilter }) {
   const filtered = lists.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true}));
-  if (!filtered.length) return <Empty icon="📋" text={"No lists yet.\nClick + New List to create one."} />;
+  if (!filtered.length) return <Empty icon="📋" text={"No lists yet.\nClick + Create List to get started."} />;
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px', display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '16px', alignContent: 'start' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff' }}>
       {filtered.map(list => {
         const assigned = contacts.filter(c => (c.lists || []).some(e => e.listId === list.id));
         const bk = {};
         assigned.forEach(c => { const e = (c.lists || []).find(e => e.listId === list.id); if (e?.status) bk[e.status] = (bk[e.status] || 0) + 1; });
 
         return (
-          <div key={list.id} style={{ background: '#fff', border: `1px solid #e2e8f0`, borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', fontFamily: 'Inter,sans-serif', lineHeight: '1.3', flex: 1, minWidth: 0 }}>{list.name}</span>
-              <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 700, color: '#4f46e5', background: '#f5f3ff', padding: '4px 10px', borderRadius: '99px', whiteSpace: 'nowrap', fontFamily: 'Inter,sans-serif' }}>{assigned.length} contact{assigned.length !== 1 ? 's' : ''}</span>
+          <div 
+            key={list.id} 
+            style={{ 
+              background: '#ffffff', 
+              border: `1px solid #e2e8f0`, 
+              borderRadius: '10px', 
+              padding: '14px 20px', 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '24px',
+              transition: 'all 0.15s ease',
+              cursor: 'default'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#e2e8f0';
+            }}
+          >
+            {/* Left Content Column */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: 0 }}>
+              
+              {/* Title & Description Stack */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                  <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', fontFamily: 'Inter,sans-serif', lineHeight: '1.4' }}>{list.name}</span>
+                  <span style={{ 
+                    flexShrink: 0, 
+                    fontSize: '11px', 
+                    fontWeight: 700, 
+                    color: '#475569', 
+                    background: '#e2e8f0', 
+                    padding: '2px 7px', 
+                    borderRadius: '4px', 
+                    fontFamily: 'Inter,sans-serif',
+                    fontVariantNumeric: 'tabular-nums',
+                    marginTop: '2px'
+                  }}>
+                    {assigned.length} contact{assigned.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div style={{ 
+                  fontSize: '12.5px', 
+                  color: '#64748b', 
+                  lineHeight: '1.4', 
+                  wordBreak: 'break-word', 
+                  fontFamily: 'Inter,sans-serif',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {list.description || 'No description provided.'}
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px', lineHeight: '1.6', wordBreak: 'break-word', fontFamily: 'Inter,sans-serif' }}>{list.description || 'No description'}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px', minHeight: '18px' }}>
-              {Object.entries(bk).map(([st, n]) => { const [bg, fg] = palFor(st, settings.listStatuses); return <Badge key={st} text={st + ' · ' + n} bg={bg} fg={fg} />; })}
+
+            {/* Middle: Status Distribution tags (horizontal) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, maxWidth: '280px', overflow: 'hidden', flexWrap: 'nowrap' }}>
+              {Object.entries(bk).length > 0 ? (
+                Object.entries(bk).slice(0, 3).map(([st, n]) => {
+                  const [bg, fg] = palFor(st, settings.listStatuses);
+                  return <Badge key={st} text={st + ' · ' + n} bg={bg} fg={fg} />;
+                })
+              ) : (
+                <span style={{ fontSize: '11.5px', color: '#cbd5e1', fontStyle: 'italic' }}>No distribution</span>
+              )}
+              {Object.entries(bk).length > 3 && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#94a3b8',
+                  padding: '2px'
+                }}>
+                  +{Object.entries(bk).length - 3}
+                </span>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Btn variant="sm" onClick={() => onFilter(list.id)}>View contacts</Btn>
-              <Btn variant="sm" onClick={() => onEdit(list)}>Edit</Btn>
-              <Btn variant="sm" onClick={() => onDelete(list.id)} style={{ color: "#ef4444" }}>Delete</Btn>
+
+            {/* Right: Tactile Action Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button 
+                onClick={() => onFilter(list.id)}
+                style={{ 
+                  padding: '7px 14px', 
+                  background: '#0f172a', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '6px', 
+                  fontFamily: 'Inter,sans-serif', 
+                  fontSize: '12px', 
+                  fontWeight: 700, 
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+                onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
+              >
+                View
+              </button>
+              
+              <button 
+                onClick={() => onEdit(list)}
+                style={{ 
+                  padding: '6px 12px', 
+                  background: '#ffffff', 
+                  color: '#475569', 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '6px', 
+                  fontFamily: 'Inter,sans-serif', 
+                  fontSize: '12px', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.background = '#f8fafc';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.background = '#ffffff';
+                }}
+              >
+                Edit
+              </button>
+
+              <button 
+                onClick={() => onDelete(list.id)}
+                style={{ 
+                  padding: '6px 10px', 
+                  background: 'transparent', 
+                  color: '#94a3b8', 
+                  border: 'none', 
+                  borderRadius: '6px', 
+                  fontFamily: 'Inter,sans-serif', 
+                  fontSize: '12px', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = '#475569';
+                  e.currentTarget.style.background = '#f1f5f9';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = '#94a3b8';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                Delete
+              </button>
             </div>
           </div>
         );

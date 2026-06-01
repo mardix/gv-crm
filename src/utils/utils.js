@@ -1,4 +1,10 @@
-export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+export const uid = (len = 16) => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < len; i++) s += chars[Math.random() * 36 | 0];
+  return s;
+};
 
 export const ini = n => n ? n.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
 

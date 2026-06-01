@@ -20,7 +20,7 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
     }
     if (search) {
       const q = search.toLowerCase();
-      return ['name', 'phone', 'email', 'handle', 'city', 'state'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+      return ['name', 'phone', 'email', 'handle', 'location'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
     }
     return true;
   }).sort((a, b) => {
@@ -36,11 +36,16 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
 
   const COLS = [
     { key: '_sel', label: '' },
-    { key: 'name', label: 'Name' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' },
+    { key: 'name', label: 'Name' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'status', label: 'Status' },
     { key: 'handle', label: 'Handle' },
-    { key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }, { key: '_tags', label: 'Tags' }, { key: '_lists', label: 'Lists' }, { key: 'comment', label: 'Notes' },
+    { key: 'location', label: 'Location' },
+    { key: '_lists', label: 'Lists' },
+    { key: 'comment', label: 'Notes' },
   ];
-  const colW = ['40px', '230px', '130px', '180px', '110px', '100px', '70px', '110px', '130px', '220px', '200px'];
+  const colW = ['40px', '230px', '180px', '130px', '70px', '130px', '130px', '200px', '250px'];
 
   const thStyle = { background: '#f8fafc', padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.8px', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none', fontFamily: 'Inter,sans-serif', lineHeight: '1.4' };
 
@@ -122,17 +127,60 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       <td style={td}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
           {c.phone && (
-            <button onClick={e => { e.stopPropagation(); onOpenMessage(c.phone); }} style={{
-              border: '1px solid #e2e8f0', cursor: 'pointer', flexShrink: 0,
-              background: '#ffffff', color: '#4f46e5',
-              padding: '5px 8px', borderRadius: '6px',
-              display: 'flex', alignItems: 'center', gap: '4px',
-              transition: 'all 0.15s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }} title="Open Conversation"
-              onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; }}
+            <button 
+              onClick={e => { e.stopPropagation(); onOpenMessage(c.phone); }} 
+              style={{
+                width: '28px',
+                height: '28px',
+                border: '1px solid #e2e8f0', 
+                cursor: 'pointer', 
+                flexShrink: 0,
+                background: '#ffffff', 
+                color: '#64748b',
+                borderRadius: '6px',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)', 
+                boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                padding: 0
+              }} 
+              title="Open Conversation"
+              onMouseEnter={e => { 
+                e.currentTarget.style.background = '#f5f3ff'; 
+                e.currentTarget.style.borderColor = '#c7d2fe'; 
+                e.currentTarget.style.color = '#4f46e5';
+                e.currentTarget.style.transform = 'translateY(-1px) scale(1.05)'; 
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(79,70,229,0.1)';
+              }}
+              onMouseLeave={e => { 
+                e.currentTarget.style.background = '#ffffff'; 
+                e.currentTarget.style.borderColor = '#e2e8f0'; 
+                e.currentTarget.style.color = '#64748b';
+                e.currentTarget.style.transform = 'none'; 
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(15,23,42,0.04)';
+              }}
             >
-              <span style={{ fontSize: '13px', lineHeight: 1 }}>💬</span>
+              <div style={{
+                width: '12px',
+                height: '9px',
+                background: 'currentColor',
+                borderRadius: '2px',
+                position: 'relative',
+                display: 'inline-block',
+                boxSizing: 'border-box'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-2px',
+                  left: '3px',
+                  width: '4px',
+                  height: '4px',
+                  background: 'currentColor',
+                  transform: 'rotate(45deg)',
+                  borderRadius: '1px'
+                }} />
+              </div>
             </button>
           )}
           <div style={{ width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px', color: '#fff', background: avatarColor(c.name), fontFamily: 'Inter,sans-serif' }}>{ini(c.name)}</div>
@@ -141,18 +189,9 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       </td>
       <td style={td}><span style={monoStyle}>{c.phone || '—'}</span></td>
       <td style={td}><span style={textStyle}>{c.email || '—'}</span></td>
-      <td style={td}><span style={{ ...monoStyle, color: c.handle ? "#4f46e5" : "#94a3b8" }}>{c.handle ? '@' + c.handle : '—'}</span></td>
-      <td style={td}><span style={textStyle}>{c.city || '—'}</span></td>
-      <td style={td}><span style={textStyle}>{c.state || '—'}</span></td>
       <td style={td}>{c.status ? <Badge text={c.status} bg={bg} fg={fg} /> : <span style={mutedStyle}>—</span>}</td>
-      <td style={td}>
-        {(c.tags || []).length
-          ? <div style={{ display: 'flex', gap: '3px', overflow: 'hidden' }}>
-            {(c.tags || []).slice(0, 3).map((t, i) => <span key={i} style={{ flexShrink: 0, padding: '2px 7px', background: '#f1f5f9', border: `1px solid #e2e8f0`, borderRadius: '99px', fontSize: '11px', color: "#64748b", whiteSpace: 'nowrap' }}>{t}</span>)}
-            {(c.tags || []).length > 3 && <span style={{ flexShrink: 0, padding: '2px 7px', background: '#f1f5f9', border: `1px solid #e2e8f0`, borderRadius: '99px', fontSize: '11px', color: "#64748b" }}>+{(c.tags || []).length - 3}</span>}
-          </div>
-          : <span style={mutedStyle}>—</span>}
-      </td>
+      <td style={td}><span style={{ ...monoStyle, color: c.handle ? "#4f46e5" : "#94a3b8" }}>{c.handle ? '@' + c.handle : '—'}</span></td>
+      <td style={td}><span style={textStyle}>{c.location || '—'}</span></td>
       <td style={td}>
         {(c.lists || []).filter(e => lists.find(l => l.id === e.listId)).length
           ? <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', overflow: 'hidden' }}>

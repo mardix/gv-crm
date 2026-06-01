@@ -432,10 +432,10 @@ export function App({ togBtn }) {
   }
 
   const addBtn =
-    view === 'contacts' ? { label: '+ New Contact', action: () => setContactModal('new') }
-      : view === 'lists' ? { label: '+ New List', action: () => setListModal('new') }
-        : view === 'forms' ? { label: '+ New Form', action: () => setFormModal('new') }
-          : view === 'campaigns' ? { label: '+ New Campaign', action: () => setCampaignModal('new') }
+    view === 'contacts' ? { label: 'Add Contact', action: () => setContactModal('new') }
+      : view === 'lists' ? { label: 'Create List', action: () => setListModal('new') }
+        : view === 'campaigns' ? { label: 'Create Campaign', action: () => setCampaignModal('new') }
+          : view === 'forms' ? { label: 'Create Form', action: () => setFormModal('new') }
             : null;
 
   function handleDownloadState() {
@@ -626,25 +626,65 @@ export function App({ togBtn }) {
         pointerEvents: open ? 'auto' : 'none',
       }}>
 
-        {/* ── Modern Topbar Header ── */}
-        <div style={{ flexShrink: 0, height: '64px', background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+        {/* ── Premium Dark Glassmorphic Topbar Header ── */}
+        <div style={{
+          flexShrink: 0,
+          height: '68px',
+          background: '#0b0f19',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '0 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+          zIndex: 10
+        }}>
           
           {/* Logo Brand Panel */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5, #4338ca)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', fontWeight: 800, boxShadow: '0 2px 8px rgba(79,70,229,0.2)' }}>GV</div>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '11px',
+              fontWeight: 800,
+              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)'
+            }}>
+              GV
+            </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
-              <div style={{ display: 'inline-flex', fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '99px', padding: '1px 6px', marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>V2.0</div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
+              <div style={{
+                display: 'inline-flex',
+                fontSize: '9px',
+                fontWeight: 700,
+                color: 'rgba(255, 255, 255, 0.8)',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '99px',
+                padding: '1px 6px',
+                marginTop: '1px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.3px'
+              }}>
+                V2.0
+              </div>
             </div>
           </div>
 
-          {/* macOS / Apple-style Segmented Nav Controls */}
+          {/* macOS / Apple-style Segmented Nav Controls (Dark Theme) */}
           <div style={{
             display: 'flex',
-            background: '#f1f5f9',
+            background: 'rgba(255, 255, 255, 0.04)',
             padding: '4px',
             borderRadius: '12px',
-            border: '1px solid #e2e8f0',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
             overflow: 'hidden',
             flexShrink: 0
           }}>
@@ -664,26 +704,26 @@ export function App({ togBtn }) {
                     lineHeight: 1.4,
                     whiteSpace: 'nowrap',
                     fontFamily: 'Inter,sans-serif',
-                    background: isActive ? '#fff' : 'transparent',
-                    color: isActive ? '#4f46e5' : '#475569',
+                    background: isActive ? 'linear-gradient(135deg, #4f46e5, #3b82f6)' : 'transparent',
+                    color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: isActive ? '0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)' : 'none'
+                    boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15)' : 'none'
                   }}
                   onMouseEnter={e => {
-                    if (!isActive) e.currentTarget.style.color = '#0f172a';
+                    if (!isActive) e.currentTarget.style.color = '#ffffff';
                   }}
                   onMouseLeave={e => {
-                    if (!isActive) e.currentTarget.style.color = '#475569';
+                    if (!isActive) e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
                   }}
                 >
                   {l}
                   {count !== null && (
                     <span style={{
-                      background: isActive ? '#eef2ff' : '#e2e8f0',
-                      color: isActive ? '#4f46e5' : '#475569',
+                      background: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                      color: isActive ? '#4f46e5' : 'rgba(255, 255, 255, 0.6)',
                       borderRadius: '99px',
                       padding: '1px 6px',
                       fontSize: '10px',
@@ -700,25 +740,27 @@ export function App({ togBtn }) {
           </div>
 
           {/* Action buttons and Minimalist Close triggers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
+            
+            {/* Context-aware Quick Action Button */}
             {addBtn && (
               <button
                 onClick={addBtn.action}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   padding: '8px 16px',
-                  background: "linear-gradient(135deg, #4f46e5, #4338ca)",
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontFamily: 'Inter,sans-serif',
-                  fontSize: '12px',
+                  fontSize: '12.5px',
                   fontWeight: 700,
                   transition: 'all 0.15s ease',
-                  boxShadow: '0 2px 6px rgba(79,70,229,0.15)'
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
                 onMouseLeave={e => e.currentTarget.style.opacity = 1}
@@ -726,15 +768,17 @@ export function App({ togBtn }) {
                 {addBtn.label}
               </button>
             )}
+
+            {/* Exit/Close trigger */}
             <button
               onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'inline-flex', 'important'); } }}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '34px',
+                height: '34px',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                color: '#64748b',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: 'rgba(255, 255, 255, 0.7)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -744,14 +788,16 @@ export function App({ togBtn }) {
                 marginLeft: '4px'
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#fca5a5';
-                e.currentTarget.style.color = '#ef4444';
-                e.currentTarget.style.background = '#fef2f2';
+                e.currentTarget.style.borderColor = '#ef4444';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.background = '#ef4444';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.color = '#64748b';
-                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
