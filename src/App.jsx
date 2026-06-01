@@ -19,7 +19,14 @@ export function App({ togBtn }) {
   const [lists, setLists] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [forms, setForms] = useState([]);
-  const [settings, setSettings] = useState({ contactStatuses: ['Active', 'Inactive', 'Banned'], listStatuses: ['Prospect', 'Qualified', 'Unqualified'], delayMin: 15, delayMax: 45, gsheetUrl: '', gsheetAuto: false });
+  const [settings, setSettings] = useState({
+    contactStatuses: ['Active', 'Inactive', 'Banned'],
+    listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
+    delayMin: 15,
+    delayMax: 45,
+    gsheetUrl: '',
+    gsheetAuto: false
+  });
 
   // Filters & sort
   const [activeCampaignStatus, setActiveCampaignStatus] = useState(null);
@@ -32,6 +39,22 @@ export function App({ togBtn }) {
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [bulkSelCollapsed, setBulkSelCollapsed] = useState(false);
+
+  const [freezeCols, setFreezeCols] = useState(() => {
+    try {
+      return localStorage.getItem('vcrm_freeze_cols') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleFreeze = () => {
+    const newVal = !freezeCols;
+    setFreezeCols(newVal);
+    try {
+      localStorage.setItem('vcrm_freeze_cols', String(newVal));
+    } catch (_) { }
+  };
 
   // Modals
   const [contactModal, setContactModal] = useState(null);  // null | contact obj | 'new'
@@ -640,7 +663,7 @@ export function App({ togBtn }) {
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
           zIndex: 10
         }}>
-          
+
           {/* Logo Brand Panel */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
             <div style={{
@@ -741,7 +764,7 @@ export function App({ togBtn }) {
 
           {/* Action buttons and Minimalist Close triggers */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
-            
+
             {/* Context-aware Quick Action Button */}
             {addBtn && (
               <button
@@ -808,33 +831,82 @@ export function App({ togBtn }) {
         {/* ── Filter bar ── */}
         {(['contacts', 'lists'].includes(view)) && (
           <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '140px', maxWidth: '260px' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.3" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-              <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 10px 6px 30px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
+            <div style={{ flex: 1, minWidth: '140px', maxWidth: '260px' }}>
+              <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 12px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
             </div>
-            {view === 'contacts' && (
-              <>
-                {[['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
-                ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
-                ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
-                ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
-                ].map(([placeholder, setter, val, opts], i) => (
-                  <select key={i} value={val} onChange={e => setter(e.target.value)} style={{ padding: '6px 26px 6px 10px', background: `#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center`, border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', maxWidth: '150px' }}>
-                    <option value="">{placeholder}</option>
-                    {opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.id || o} value={o.id || o}>{o.label || o}</option>)}
-                  </select>
-                ))}
-                <span style={{ fontSize: '11.5px', color: "#94a3b8", whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                  {contacts.filter(c => (!filterStatus || c.status === filterStatus) && (!filterTag || c.tags?.includes(filterTag)) && (!filterListId || (c.lists || []).some(e => e.listId === filterListId))).length} of {contacts.length}
-                </span>
-              </>
-            )}
+            {view === 'contacts' && (() => {
+              const filteredCount = contacts.filter(c => {
+                if (filterStatus && c.status !== filterStatus) return false;
+                if (filterTag && !(c.tags || []).includes(filterTag)) return false;
+                if (filterListId) {
+                  const e = (c.lists || []).find(e => String(e.listId) === String(filterListId));
+                  if (!e) return false;
+                  if (filterListStatus && e.status !== filterListStatus) return false;
+                }
+                if (search) {
+                  const q = search.toLowerCase();
+                  return ['name', 'phone', 'email', 'handle', 'location'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+                }
+                return true;
+              }).length;
+
+              return (
+                <>
+                  {[['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
+                  ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
+                  ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
+                  ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
+                  ].map(([placeholder, setter, val, opts], i) => (
+                    <select key={i} value={val} onChange={e => setter(e.target.value)} style={{ padding: '6px 26px 6px 10px', background: `#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center`, border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', maxWidth: '150px' }}>
+                      <option value="">{placeholder}</option>
+                      {opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.id || o} value={o.id || o}>{o.label || o}</option>)}
+                    </select>
+                  ))}
+                  <span style={{ fontSize: '11.5px', color: "#94a3b8", whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', marginLeft: 'auto' }}>
+                    {filteredCount} of {contacts.length}
+                  </span>
+                  <button
+                    onClick={toggleFreeze}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '5px 10px',
+                      background: freezeCols ? '#eef2ff' : '#f1f5f9',
+                      border: freezeCols ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+                      borderRadius: '7px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: freezeCols ? '#4f46e5' : '#475569',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => {
+                      if (!freezeCols) {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.background = '#e2e8f0';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!freezeCols) {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = '#f1f5f9';
+                      }
+                    }}
+                  >
+                    <span style={{ fontSize: '12px' }}>❄️</span>
+                    <span>{freezeCols ? 'Frozen' : 'Freeze'}</span>
+                  </button>
+                </>
+              );
+            })()}
           </div>
         )}
 
         {/* ── Body ── */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-          {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} />}
+          {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
 
           {/* Bulk Actions Bar */}
           {view === 'contacts' && selectedIds.length > 0 && (
