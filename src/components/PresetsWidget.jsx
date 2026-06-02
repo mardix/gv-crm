@@ -34,6 +34,47 @@ export function PresetsWidget({ activeContact, settings }) {
     }
   };
 
+  if (collapsed) {
+    return (
+      <button
+        onClick={() => setCollapsed(false)}
+        style={{
+          position: 'fixed', bottom: '65px', right: '24px',
+          zIndex: 2147483646,
+          width: '46px',
+          height: '46px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1e1b4b, #090514)',
+          color: '#fff',
+          border: '1px solid rgba(139, 92, 246, 0.25)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '18px',
+          boxShadow: '0 8px 24px rgba(9, 5, 20, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15)',
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: 'auto',
+          outline: 'none',
+          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+        }}
+        title="Insert Preset Text"
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'scale(1.08) translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 12px 30px rgba(9, 5, 20, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.25)';
+          e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.45)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'none';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(9, 5, 20, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15)';
+          e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.25)';
+        }}
+      >
+        ⚡
+      </button>
+    );
+  }
+
   return (
     <div className="vcrm-widget" style={{
       position: 'fixed', bottom: '65px', right: '24px',
@@ -43,64 +84,62 @@ export function PresetsWidget({ activeContact, settings }) {
       borderRadius: '20px',
       width: '300px', fontFamily: '"Outfit", "Inter", sans-serif',
       pointerEvents: 'auto', overflow: 'hidden',
+      boxShadow: '0 8px 32px rgba(15,23,42,0.12), 0 1px 4px rgba(15,23,42,0.08)',
+      border: '1.5px solid #e2e8f0'
     }}>
       {/* Header */}
-
       <div
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 18px', cursor: 'pointer', gap: '12px',
-          background: collapsed ? '#fff' : 'rgba(248, 250, 252, 0.9)',
-          borderBottom: collapsed ? 'none' : '1px solid rgba(15, 23, 42, 0.06)',
+          background: 'linear-gradient(135deg, #1e1b4b, #090514)',
+          borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
           transition: 'background 0.2s',
         }}
-        onClick={() => setCollapsed(c => !c)}
+        onClick={() => setCollapsed(true)}
       >
-        <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-          ⚡ GV-CRM: Preset Texts
+        <span style={{ fontSize: '11px', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          ⚡ Preset Texts
         </span>
         <span style={{
-          fontSize: '16px', color: '#94a3b8', lineHeight: 1,
-          display: 'inline-block', transition: 'transform 0.2s',
-          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-        }}>▾</span>
+          fontSize: '14px', color: '#a5b4fc', lineHeight: 1,
+          display: 'inline-block', cursor: 'pointer'
+        }}>✕</span>
       </div>
 
       {/* Preset list */}
-      {!collapsed && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '380px', overflowY: 'auto' }}>
-          {presets.map((p, i) => (
-            <div
-              key={i}
-              onClick={() => handleFill(p.text)}
-              style={{
-                padding: '13px 18px',
-                borderBottom: i < presets.length - 1 ? '1px solid #f1f5f9' : 'none',
-                cursor: 'pointer', transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              {p.title && (
-                <div style={{
-                  fontSize: '10px', fontWeight: 800, color: '#4f46e5',
-                  textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '5px',
-                }}>
-                  {p.title}
-                </div>
-              )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '380px', overflowY: 'auto' }}>
+        {presets.map((p, i) => (
+          <div
+            key={i}
+            onClick={() => handleFill(p.text)}
+            style={{
+              padding: '13px 18px',
+              borderBottom: i < presets.length - 1 ? '1px solid #f1f5f9' : 'none',
+              cursor: 'pointer', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {p.title && (
               <div style={{
-                fontSize: '13px', color: '#334155', lineHeight: 1.5,
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                display: '-webkit-box', WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                fontSize: '10px', fontWeight: 800, color: '#4f46e5',
+                textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '5px',
               }}>
-                {p.text}
+                {p.title}
               </div>
+            )}
+            <div style={{
+              fontSize: '13px', color: '#334155', lineHeight: 1.5,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              display: '-webkit-box', WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>
+              {p.text}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

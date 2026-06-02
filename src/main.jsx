@@ -20,36 +20,54 @@ function setup() {
   const togStyles = [
     'all:unset',
     'position:fixed !important',
-    'top:40% !important',
-    'right:-30px !important',
-    'transform:translateY(-50%) rotate(-90deg) !important',
+    'top:30% !important',
+    'right:0 !important',
+    'transform:translateY(-50%) !important',
     'z-index:2147483647 !important',
-    'display:inline-flex !important',
+    'display:flex !important',
     'align-items:center !important',
     'justify-content:center !important',
-    'gap:8px !important',
-    'padding:11px 22px !important',
-    'background:#0f172a !important',
-    'color:#fff !important',
-    'border:none !important',
-    'border-radius:99px !important',
+    'width:38px !important',
+    'height:94px !important',
+    'background:linear-gradient(135deg, #1e1b4b, #090514) !important',
+    'border:1px solid rgba(139, 92, 246, 0.3) !important',
+    'border-right:none !important',
+    'border-radius:20px 0 0 20px !important',
     'cursor:pointer !important',
-    'font-family:Inter,sans-serif !important',
-    'font-size:16px !important',
-    'font-weight:700 !important',
-    'line-height:normal !important',
-    'white-space:nowrap !important',
-    'letter-spacing:.3px !important',
+    'box-shadow:-4px 0 16px rgba(9, 5, 20, 0.45) !important',
+    'transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important',
     'opacity:1 !important',
     'visibility:visible !important',
     'pointer-events:auto !important',
-    'text-decoration:none !important',
   ];
   togBtn.setAttribute('style', togStyles.join(';'));
-  togBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;flex-shrink:0;display:block"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span style="pointer-events:none;display:inline;color:#fff;font-size:13px;font-weight:700;font-family:Inter,sans-serif;letter-spacing:.3px">GV-CRM</span>';
+  togBtn.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;color:#fff;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <div style="font-size:9px;font-weight:900;color:#fff;font-family:'Outfit','Inter',sans-serif;letter-spacing:0.8px;text-align:center;line-height:1.2;text-transform:uppercase;">
+        C<br/>R<br/>M
+      </div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin-top:2px;">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </div>
+  `;
 
-  togBtn.addEventListener('mouseenter', () => togBtn.style.setProperty('background', '#4338ca', 'important'));
-  togBtn.addEventListener('mouseleave', () => togBtn.style.setProperty('background', '#0f172a', 'important'));
+  togBtn.addEventListener('mouseenter', () => {
+    togBtn.style.setProperty('width', '44px', 'important');
+    togBtn.style.setProperty('border-color', 'rgba(139, 92, 246, 0.5)', 'important');
+    togBtn.style.setProperty('box-shadow', '-6px 0 20px rgba(9, 5, 20, 0.6)', 'important');
+  });
+  togBtn.addEventListener('mouseleave', () => {
+    togBtn.style.setProperty('width', '38px', 'important');
+    togBtn.style.setProperty('border-color', 'rgba(139, 92, 246, 0.3)', 'important');
+    togBtn.style.setProperty('box-shadow', '-4px 0 16px rgba(9, 5, 20, 0.45)', 'important');
+  });
   document.body.appendChild(togBtn);
 
   root = document.createElement('div');
@@ -98,7 +116,7 @@ chrome.runtime.onMessage.addListener((msg) => {
         root.dispatchEvent(new CustomEvent('vcrm-open'));
       } else {
         root.dispatchEvent(new CustomEvent('vcrm-close'));
-        if (togBtn) togBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (togBtn) togBtn.style.setProperty('display', 'flex', 'important');
       }
     }
   } else if (msg.action === 'disableUI') {

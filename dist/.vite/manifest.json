@@ -9,9 +9,9 @@
     "file": "assets/jsxRuntime.module-DYcKo6ph.js",
     "name": "jsxRuntime.module"
   },
-  "_main.jsx-loader-ihd6kkcL.js": {
-    "file": "assets/main.jsx-loader-ihd6kkcL.js",
-    "src": "_main.jsx-loader-ihd6kkcL.js"
+  "_main.jsx-loader-D-aBpefp.js": {
+    "file": "assets/main.jsx-loader-D-aBpefp.js",
+    "src": "_main.jsx-loader-D-aBpefp.js"
   },
   "src/background.js": {
     "file": "assets/background.js-IaRnzKK7.js",
@@ -20,7 +20,7 @@
     "isEntry": true
   },
   "src/main.jsx": {
-    "file": "assets/main.jsx-TyDWt8tt.js",
+    "file": "assets/main.jsx-BdL28-29.js",
     "name": "main.jsx",
     "src": "src/main.jsx",
     "isEntry": true,

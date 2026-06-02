@@ -22,6 +22,9 @@ export function App({ togBtn }) {
   const [settings, setSettings] = useState({
     contactStatuses: ['Active', 'Inactive', 'Banned'],
     listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
+    membershipLevels: ['Standard', 'Plus', 'Premium', 'VIP', 'Elite'],
+    leadSources: ['Google', 'Referral', 'Social Media', 'Cold Call', 'Other'],
+    categories: ['Client', 'Prospect', 'Partner', 'Vendor'],
     delayMin: 15,
     delayMax: 45,
     gsheetUrl: '',
@@ -35,6 +38,9 @@ export function App({ togBtn }) {
   const [filterListId, setFilterListId] = useState('');
   const [filterListStatus, setFilterListStatus] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [filterMembershipLevel, setFilterMembershipLevel] = useState('');
+  const [filterLeadSource, setFilterLeadSource] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
@@ -109,9 +115,10 @@ export function App({ togBtn }) {
       name: c.name,
       phone: c.phone,
       email: c.email,
-      status: gsStatus,
-      category: (s === 'vip' || c.tags?.some(t => t.toLowerCase() === 'vip')) ? 'VIP' : 'Regular',
-      membershipLevel: 'Basic',
+      status: c.status || gsStatus,
+      category: c.category || ((s === 'vip' || c.tags?.some(t => t.toLowerCase() === 'vip')) ? 'VIP' : 'Regular'),
+      membershipLevel: c.membershipLevel || 'Basic',
+      leadSource: c.leadSource || '',
       location: c.location || '',
       handle: c.handle,
       note: c.comment,
@@ -198,7 +205,10 @@ export function App({ togBtn }) {
         handle: c.handle,
         location: c.location || '',
         status: c.status,
-        tags: c.category === 'VIP' ? ['VIP'] : [],
+        category: c.category || '',
+        membershipLevel: c.membershipLevel || '',
+        leadSource: c.leadSource || '',
+        tags: c.tags || (c.category === 'VIP' ? ['VIP'] : []),
         comment: c.note,
         lists: (c.lists || []).map(l => ({
           listId: l.listId,
@@ -311,6 +321,7 @@ export function App({ togBtn }) {
 
   function switchView(v) {
     setView(v); setSearch(''); setFilterStatus(''); setFilterListId(''); setFilterListStatus(''); setFilterTag('');
+    setFilterMembershipLevel(''); setFilterLeadSource(''); setFilterCategory('');
   }
 
   function handleSort(col) {
@@ -364,6 +375,9 @@ export function App({ togBtn }) {
           handle: String(row.handle || '').trim(),
           location: String(row.location || row.city || row.state || '').trim(),
           status: String(row.status || '').trim(),
+          leadSource: String(row.leadSource || row.lead_source || row.source || '').trim(),
+          category: String(row.category || '').trim(),
+          membershipLevel: String(row.membershipLevel || row.membership_level || row.membership || '').trim(),
           tags: String(row.tags || '').split(/[,;]/).map(t => t.trim()).filter(Boolean),
           comment: String(row.comment || '').trim(),
           lists: targetLists
@@ -607,7 +621,7 @@ export function App({ togBtn }) {
     });
 
     setOpen(false);
-    if (togBtn) togBtn.style.setProperty('display', 'inline-flex', 'important');
+    if (togBtn) togBtn.style.setProperty('display', 'flex', 'important');
   }
 
   useEffect(() => {
@@ -653,8 +667,8 @@ export function App({ togBtn }) {
         <div style={{
           flexShrink: 0,
           height: '68px',
-          background: '#0b0f19',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'linear-gradient(135deg, #1e1b4b, #090514)',
+          borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
           padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
@@ -794,7 +808,7 @@ export function App({ togBtn }) {
 
             {/* Exit/Close trigger */}
             <button
-              onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'inline-flex', 'important'); } }}
+              onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } }}
               style={{
                 width: '34px',
                 height: '34px',
@@ -838,6 +852,9 @@ export function App({ togBtn }) {
               const filteredCount = contacts.filter(c => {
                 if (filterStatus && c.status !== filterStatus) return false;
                 if (filterTag && !(c.tags || []).includes(filterTag)) return false;
+                if (filterMembershipLevel && c.membershipLevel !== filterMembershipLevel) return false;
+                if (filterLeadSource && c.leadSource !== filterLeadSource) return false;
+                if (filterCategory && c.category !== filterCategory) return false;
                 if (filterListId) {
                   const e = (c.lists || []).find(e => String(e.listId) === String(filterListId));
                   if (!e) return false;
@@ -845,17 +862,21 @@ export function App({ togBtn }) {
                 }
                 if (search) {
                   const q = search.toLowerCase();
-                  return ['name', 'phone', 'email', 'handle', 'location'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+                  return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
                 }
                 return true;
               }).length;
 
               return (
                 <>
-                  {[['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
-                  ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
-                  ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
-                  ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
+                  {[
+                    ['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
+                    ['All memberships', setFilterMembershipLevel, filterMembershipLevel, settings.membershipLevels || []],
+                    ['All sources', setFilterLeadSource, filterLeadSource, settings.leadSources || []],
+                    ['All categories', setFilterCategory, filterCategory, settings.categories || []],
+                    ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
+                    ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
+                    ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
                   ].map(([placeholder, setter, val, opts], i) => (
                     <select key={i} value={val} onChange={e => setter(e.target.value)} style={{ padding: '6px 26px 6px 10px', background: `#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center`, border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', maxWidth: '150px' }}>
                       <option value="">{placeholder}</option>
@@ -906,7 +927,7 @@ export function App({ togBtn }) {
 
         {/* ── Body ── */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-          {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
+          {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} filterMembershipLevel={filterMembershipLevel} filterLeadSource={filterLeadSource} filterCategory={filterCategory} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
 
           {/* Bulk Actions Bar */}
           {view === 'contacts' && selectedIds.length > 0 && (

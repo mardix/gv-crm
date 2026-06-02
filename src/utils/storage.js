@@ -12,6 +12,9 @@ export function loadData(cb) {
         city: '',
         state: '',
         location: '',
+        leadSource: '',
+        category: '',
+        membershipLevel: '',
         ...c
       }));
     const lists = d.vcrm_lists || [];
@@ -21,6 +24,9 @@ export function loadData(cb) {
     const settings = {
       contactStatuses: ['Active', 'Inactive', 'Banned'],
       listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
+      membershipLevels: ['Standard', 'Plus', 'Premium', 'VIP', 'Elite'],
+      leadSources: ['Google', 'Referral', 'Social Media', 'Cold Call', 'Other'],
+      categories: ['Client', 'Prospect', 'Partner', 'Vendor'],
       hideRightSidebar: true,
       ...(rawS || {}),
     };

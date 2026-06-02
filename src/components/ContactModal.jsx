@@ -9,7 +9,7 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
   const isNew = !contact;
   const [data, setData] = useState(() => contact
     ? JSON.parse(JSON.stringify(contact))
-    : { id: uid(), name: '', phone: '', email: '', handle: '', location: '', tags: [], status: '', comment: '', lists: [], dnd: false }
+    : { id: uid(), name: '', phone: '', email: '', handle: '', location: '', tags: [], status: '', leadSource: '', category: '', membershipLevel: '', comment: '', lists: [], dnd: false }
   );
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
@@ -102,6 +102,26 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
               Off-limits for campaigns
             </div>
           </label>
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
+        <Field label="Membership Level">
+          <Select value={data.membershipLevel} onChange={e => set('membershipLevel', e.target.value)}>
+            <option value="">— None —</option>
+            {(settings.membershipLevels || []).map(s => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </Field>
+        <Field label="Lead Source">
+          <Select value={data.leadSource} onChange={e => set('leadSource', e.target.value)}>
+            <option value="">— None —</option>
+            {(settings.leadSources || []).map(s => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </Field>
+        <Field label="Category">
+          <Select value={data.category} onChange={e => set('category', e.target.value)}>
+            <option value="">— None —</option>
+            {(settings.categories || []).map(s => <option key={s} value={s}>{s}</option>)}
+          </Select>
         </Field>
       </div>
       <Field label="Tags"><TagEditor /></Field>

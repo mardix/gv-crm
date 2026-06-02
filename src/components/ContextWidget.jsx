@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Badge } from './Badge';
 import { Btn } from './Btn';
-import { palFor } from '../utils/utils';
+import { palFor, avatarColor, ini } from '../utils/utils';
 
 /* Contact widget is 300px at left:24. Form panel sits right of it: 24+300+12=336 */
 const WIDGET_LEFT = '24px';
@@ -63,8 +63,8 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '14px 18px', cursor: 'pointer', gap: '12px',
-            background: collapsed ? '#fff' : 'rgba(248,250,252,0.9)',
-            borderBottom: collapsed ? 'none' : '1px solid rgba(15,23,42,0.06)',
+            background: 'linear-gradient(135deg, #1e1b4b, #090514)',
+            borderBottom: collapsed ? 'none' : '1px solid rgba(139, 92, 246, 0.2)',
             transition: 'background 0.2s',
           }}
           onClick={() => setCollapsed(c => !c)}
@@ -73,16 +73,19 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
             <div style={{
               width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0,
               background: isUnknown ? '#f59e0b' : '#10b981',
-              boxShadow: isUnknown ? '0 0 0 3px rgba(245,158,11,0.15)' : '0 0 0 3px rgba(16,185,129,0.15)',
+              boxShadow: isUnknown ? '0 0 0 3px rgba(245,158,11,0.2)' : '0 0 0 3px rgba(16,185,129,0.2)',
             }} />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              GV-CRM: Contact
-              {contact?.dnd && <span style={{ color: 'rgb(185,28,28)', fontSize: '10px', fontWeight: 700 }}>&nbsp;🚫 DND</span>}
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>
+              CRM
+              {contact?.dnd && <span style={{ color: '#ef4444', fontSize: '9px', fontWeight: 700 }}>&nbsp;🚫 DND</span>}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {contact?.membershipLevel && (
+              <Badge text={contact.membershipLevel} bg="rgba(14, 165, 233, 0.15)" fg="#38bdf8" />
+            )}
             <Badge text={contact ? (contact.status || 'Saved') : 'NOT SAVED'} bg={bg} fg={fg} />
-            <span style={{ fontSize: '16px', color: '#94a3b8', lineHeight: 1, display: 'inline-block', transition: 'transform 0.2s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+            <span style={{ fontSize: '16px', color: '#a5b4fc', lineHeight: 1, display: 'inline-block', transition: 'transform 0.2s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
           </div>
         </div>
 
@@ -90,18 +93,37 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
         {!collapsed && (
           <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-            {/* Name + phone */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: 1.2, wordBreak: 'break-word' }}>
-                {contact?.name || activeContact.contactName || 'New Contact'}
+            {/* Premium Initials Avatar + Name & Phone stack */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                width: '38px', 
+                height: '38px', 
+                borderRadius: '50%', 
+                background: avatarColor(contact?.name || activeContact.contactName || 'New Contact'), 
+                color: '#fff', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                fontWeight: 700, 
+                fontSize: '13px', 
+                fontFamily: '"Outfit",sans-serif',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                flexShrink: 0
+              }}>
+                {ini(contact?.name || activeContact.contactName || 'New Contact')}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.27-2.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                </svg>
-                <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500, fontFamily: '"DM Mono", monospace' }}>
-                  {activeContact.formattedPhone}
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: 1.2, wordBreak: 'break-word' }}>
+                  {contact?.name || activeContact.contactName || 'New Contact'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.27-2.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, fontFamily: '"DM Mono", monospace' }}>
+                    {activeContact.formattedPhone}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -117,6 +139,41 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
                     "{contact.comment}"
                   </div>
                 )}
+                {(contact.leadSource || contact.category) && (
+                  <div style={{ display: 'flex', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1.5px solid #e2e8f0', flexDirection: 'column' }}>
+                    {contact.leadSource && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Source</span>
+                        <span style={{ 
+                          fontWeight: 700, 
+                          color: '#166534', 
+                          background: '#f0fdf4', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px', 
+                          fontSize: '10px', 
+                          textTransform: 'uppercase',
+                          border: '1px solid #bbf7d0'
+                        }}>{contact.leadSource}</span>
+                      </div>
+                    )}
+                    {contact.leadSource && contact.category && <div style={{ height: '1px', background: '#e2e8f0' }} />}
+                    {contact.category && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Category</span>
+                        <span style={{ 
+                          fontWeight: 700, 
+                          color: '#5b21b6', 
+                          background: '#f5f3ff', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px', 
+                          fontSize: '10px', 
+                          textTransform: 'uppercase',
+                          border: '1px solid #ddd6fe'
+                        }}>{contact.category}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {contact.tags?.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {contact.tags.map(t => (
@@ -125,14 +182,22 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
                   </div>
                 )}
                 {contact.lists?.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '6px', 
+                    maxHeight: '110px', 
+                    overflowY: 'auto',
+                    paddingRight: '2px'
+                  }}>
                     {contact.lists.map(l => {
                       const lo = lists?.find(x => x.id === l.listId);
                       if (!lo) return null;
+                      const [ebg, efg] = palFor(l.status, settings.listStatuses);
                       return (
-                        <div key={l.listId} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', padding: '8px 10px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12.5px' }}>
+                        <div key={l.listId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 10px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12.5px', flexShrink: 0 }}>
                           <span style={{ fontWeight: 700, color: '#0f172a', flex: 1, wordBreak: 'break-word', lineHeight: 1.3 }}>{lo.name}</span>
-                          {l.status && <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: 800, color: '#475569', background: '#f1f5f9', padding: '3px 6px', borderRadius: '6px', textTransform: 'uppercase', lineHeight: 1, marginTop: '2px' }}>{l.status}</span>}
+                          {l.status && <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: 800, color: efg || '#475569', background: ebg || '#f1f5f9', padding: '3px 6px', borderRadius: '6px', textTransform: 'uppercase', lineHeight: 1 }}>{l.status}</span>}
                         </div>
                       );
                     })}

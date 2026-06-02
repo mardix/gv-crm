@@ -284,6 +284,9 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
             <>
               <StatusEditor title="Contact Statuses" desc="Overall status of a contact — how active or important they are in the CRM." statusKey="contactStatuses" settings={settings} onUpdate={onUpdate} />
               <StatusEditor title="List Statuses" desc="Per-list status — where a contact is in your outreach or event flow." statusKey="listStatuses" settings={settings} onUpdate={onUpdate} />
+              <StatusEditor title="Membership Levels" desc="Configure membership tiers for your contacts." statusKey="membershipLevels" settings={settings} onUpdate={onUpdate} />
+              <StatusEditor title="Lead Sources" desc="Configure the acquisition channels for your leads." statusKey="leadSources" settings={settings} onUpdate={onUpdate} />
+              <StatusEditor title="Categories" desc="Configure categories for high-level grouping of contacts." statusKey="categories" settings={settings} onUpdate={onUpdate} />
               <PresetTextsEditor settings={settings} onUpdate={onUpdate} />
             </>
           )}

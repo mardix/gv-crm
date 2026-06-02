@@ -2,17 +2,20 @@ import { useState, useEffect } from 'preact/hooks';
 import { Badge } from '../components/Badge';
 import { palFor, avatarColor, ini } from '../utils/utils';
 
-export function ContactsView({ contacts, lists, settings, search, filterStatus, filterListId, filterListStatus, filterTag, sortCol, sortDir, onSort, onEdit, selectedIds, onSelect, onOpenMessage, freezeCols }) {
+export function ContactsView({ contacts, lists, settings, search, filterStatus, filterListId, filterListStatus, filterTag, filterMembershipLevel, filterLeadSource, filterCategory, sortCol, sortDir, onSort, onEdit, selectedIds, onSelect, onOpenMessage, freezeCols }) {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 100;
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterStatus, filterListId, filterListStatus, filterTag, sortCol, sortDir]);
+  }, [search, filterStatus, filterListId, filterListStatus, filterTag, filterMembershipLevel, filterLeadSource, filterCategory, sortCol, sortDir]);
 
   const rows = contacts.filter(c => {
     if (filterStatus && c.status !== filterStatus) return false;
     if (filterTag && !(c.tags || []).includes(filterTag)) return false;
+    if (filterMembershipLevel && c.membershipLevel !== filterMembershipLevel) return false;
+    if (filterLeadSource && c.leadSource !== filterLeadSource) return false;
+    if (filterCategory && c.category !== filterCategory) return false;
     if (filterListId) {
       const e = (c.lists || []).find(e => String(e.listId) === String(filterListId));
       if (!e) return false;
@@ -20,7 +23,7 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
     }
     if (search) {
       const q = search.toLowerCase();
-      return ['name', 'phone', 'email', 'handle', 'location'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+      return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
     }
     return true;
   }).sort((a, b) => {
@@ -40,6 +43,9 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
     { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' },
     { key: 'status', label: 'Status' },
+    { key: 'membershipLevel', label: 'Membership' },
+    { key: 'leadSource', label: 'Source' },
+    { key: 'category', label: 'Category' },
     { key: 'handle', label: 'Handle' },
     { key: 'location', label: 'Location' },
     { key: '_lists', label: 'Lists' },
@@ -50,11 +56,15 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
     '230px',
     '120px',
     '130px',
-    '100px',
+    '130px',
+    '120px',
+    '120px',
+    '120px',
     '150px',
     '130px',
     '250px',
-    '250px'];
+    '250px'
+  ];
 
   const thStyle = { background: '#ffffff', padding: '12px 14px', textAlign: 'left', fontSize: '10.5px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.8px', borderBottom: '2px solid #e2e8f0', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none', fontFamily: 'Inter,sans-serif', lineHeight: '1.4' };
 
@@ -368,6 +378,51 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       <td style={getTdStyle(false, false, 'phone')}><span style={monoStyle}>{c.phone || '—'}</span></td>
       <td style={getTdStyle(false, false, 'email')}><span style={textStyle}>{c.email || '—'}</span></td>
       <td style={getTdStyle(false, false, 'status')}>{c.status ? <Badge text={c.status} bg={bg} fg={fg} /> : <span style={mutedStyle}>—</span>}</td>
+      <td style={getTdStyle(false, false, 'membershipLevel')}>
+        {c.membershipLevel ? (
+          <span style={{ 
+            fontSize: '11px', 
+            fontWeight: 700, 
+            background: '#e0f2fe', 
+            color: '#0369a1', 
+            border: '1px solid #bae6fd', 
+            padding: '3px 8px', 
+            borderRadius: '6px',
+            textTransform: 'uppercase',
+            display: 'inline-block'
+          }}>{c.membershipLevel}</span>
+        ) : <span style={mutedStyle}>—</span>}
+      </td>
+      <td style={getTdStyle(false, false, 'leadSource')}>
+        {c.leadSource ? (
+          <span style={{ 
+            fontSize: '11px', 
+            fontWeight: 700, 
+            background: '#f0fdf4', 
+            color: '#166534', 
+            border: '1px solid #bbf7d0', 
+            padding: '3px 8px', 
+            borderRadius: '6px',
+            textTransform: 'uppercase',
+            display: 'inline-block'
+          }}>{c.leadSource}</span>
+        ) : <span style={mutedStyle}>—</span>}
+      </td>
+      <td style={getTdStyle(false, false, 'category')}>
+        {c.category ? (
+          <span style={{ 
+            fontSize: '11.5px', 
+            fontWeight: 700, 
+            background: '#f5f3ff', 
+            color: '#5b21b6', 
+            border: '1px solid #ddd6fe', 
+            padding: '3px 8px', 
+            borderRadius: '6px',
+            textTransform: 'uppercase',
+            display: 'inline-block'
+          }}>{c.category}</span>
+        ) : <span style={mutedStyle}>—</span>}
+      </td>
       <td style={getTdStyle(false, false, 'handle')}>
         {c.handle ? (
           <span style={{
