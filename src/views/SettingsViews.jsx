@@ -193,12 +193,12 @@ function PresetTextsEditor({ settings, onUpdate }) {
 }
 
 /* ─── Main settings View (Master-Detail tabbed layout) ─── */
-export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar }) {
+export function SettingsView({ settings, onUpdate, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar }) {
   const [activeTab, setActiveTab] = useState('customization');
 
   const MENU_ITEMS = [
     { id: 'customization', label: '🎨 Customization', desc: 'CRM Statuses & Preset Texts' },
-    { id: 'integrations', label: '🔌 Data Sync', desc: 'Google Sheets Sync & Webhooks Integrations' },
+    { id: 'integrations', label: '🔌 Data Sync', desc: 'Google Sheets Cloud Sync Integration' },
     { id: 'data', label: '💾 Data & Backup', desc: 'Cloud snapshots & bulk imports' },
     { id: 'system', label: '⚙ System Settings', desc: 'Delay pacing & layout options' }
   ];
@@ -341,63 +341,6 @@ export function SettingsView({ settings, onUpdate, onManualWebhook, onManualGShe
                       onMouseLeave={e => e.currentTarget.style.opacity = 1}
                     >
                       🔄 Full Sync with Google Sheets
-                    </button>
-                  </div>
-                </div>
-              </SettingsCard>
-
-              <SettingsCard
-                title="Webhook Integration"
-                desc="Synchronize your workspace state securely to an external URL. Method is always POST."
-                action={
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    background: settings.webhookUrl ? '#dcfce7' : '#fee2e2',
-                    color: settings.webhookUrl ? '#15803d' : '#b91c1c',
-                    border: `1px solid ${settings.webhookUrl ? '#86efac' : '#fecaca'}`
-                  }}>
-                    {settings.webhookUrl ? '● Connected' : '○ Unconfigured'}
-                  </span>
-                }
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Webhook URL</label>
-                    <input type="text" placeholder="https://external-api.com/webhooks/incoming..." value={settings.webhookUrl || ''} onInput={e => onUpdate('webhookUrl', e.target.value)}
-                      style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #cbd5e1`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
-                      onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
-                      onBlur={e => { e.target.style.borderColor = "#cbd5e1"; e.target.style.boxShadow = 'none'; }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Header Secret <span style={{ fontWeight: 400, color: '#94a3b8' }}>(Authorization / x-webhook-secret)</span></label>
-                    <input type="password" placeholder="Enter optional secure token key" value={settings.webhookSecret || ''} onInput={e => onUpdate('webhookSecret', e.target.value)}
-                      style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #cbd5e1`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
-                      onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
-                      onBlur={e => { e.target.style.borderColor = "#cbd5e1"; e.target.style.boxShadow = 'none'; }} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px', padding: '12px 0 4px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync State</div>
-                      <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Automatically shoot the payload via POST whenever any data updates.</div>
-                    </div>
-                    <button onClick={() => onUpdate('webhookAuto', !settings.webhookAuto)} style={{
-                      width: '46px', height: '24px', borderRadius: '12px', background: settings.webhookAuto ? '#4f46e5' : '#e2e8f0',
-                      border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
-                    }}>
-                      <div style={{
-                        width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
-                        position: 'absolute', top: '3px', left: settings.webhookAuto ? '25px' : '3px',
-                        transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
-                      }}></div>
-                    </button>
-                  </div>
-                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                    <button onClick={onManualWebhook} style={{ width: '100%', padding: '14px 0', background: "#0f172a", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'opacity 0.2s', letterSpacing: '.3px' }}>
-                      🚀 Send Payload Manually
                     </button>
                   </div>
                 </div>
@@ -596,7 +539,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
 
         {!gsheetUrl ? (
           <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
-            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Webhook & Sheets tab to enable cloud backup and restore.
+            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud backup and restore.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

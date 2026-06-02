@@ -154,16 +154,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return false;
   }
 
-  if (msg.action === 'sendWebhook') {
-    const { url, secret, payload } = msg;
-    const headers = { 'Content-Type': 'application/json' };
-    if (secret) headers['x-webhook-secret'] = secret;
-    fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) })
-      .then(res => res.ok ? { ok: true } : { error: 'Status: ' + res.status })
-      .then(sendResponse)
-      .catch(e => sendResponse({ error: e.message }));
-    return true;
-  }
+
 
   if (msg.action === 'gsheetAction') {
     const { url, payload, method = 'POST' } = msg;

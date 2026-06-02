@@ -74,23 +74,7 @@ export function App({ togBtn }) {
 
   const state = { contacts, lists, campaigns, forms, settings };
 
-  async function sendWebhook(manual = false) {
-    if (!settings.webhookUrl) {
-      if (manual) alert('Please setup a valid Webhook URL in Settings.');
-      return;
-    }
-    chrome.runtime.sendMessage({
-      action: 'sendWebhook',
-      url: settings.webhookUrl,
-      secret: settings.webhookSecret,
-      payload: state
-    }, (res) => {
-      if (manual) {
-        if (res && res.error) alert('Webhook failed: ' + res.error);
-        else if (res && res.ok) alert('Webhook successfully triggered!');
-      }
-    });
-  }
+
 
   function sendGSheetAction(action, payload, method = 'POST') {
     if (!settings.gsheetUrl) return Promise.resolve({ ok: false, error: 'No GSheet URL' });
@@ -315,7 +299,6 @@ export function App({ togBtn }) {
   useEffect(() => {
     if (loaded) {
       saveData(state);
-      if (settings.webhookAuto) sendWebhook();
     }
   }, [contacts, lists, campaigns, forms, settings]);
 
@@ -1020,7 +1003,7 @@ export function App({ togBtn }) {
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualWebhook={() => sendWebhook(true)} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
         </div>
       </div>
 

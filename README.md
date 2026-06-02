@@ -15,7 +15,7 @@ A lightweight Chrome extension that builds a powerful **CRM** directly into *Goo
 - **� Do Not Contact (DND)** — Flag contacts as off-limits. DND contacts are automatically excluded from all campaigns.
 - **⏸ Auto-Pause Campaigns** — If Google Voice signals a rate limit, the campaign pauses itself automatically and alerts you.
 - **💾 Import / Export** — Import contacts from CSV or JSON. Export contacts, or back up your entire workspace as a single JSON snapshot.
-- **🔒 100% Local** — All data lives in `chrome.storage.local`. Nothing leaves your device unless you set up a Webhook.
+- **🔒 100% Local** — All data lives in `chrome.storage.local`. Nothing leaves your device unless you set up Google Sheets sync.
 
 ---
 
@@ -80,13 +80,11 @@ npm run build
 | Campaign Pacing | Min/max delay in seconds between messages |
 | Preset Texts | Manage quick-insert message snippets |
 | Hide GV Sidebar | Collapses Google Voice's right panel for more space |
-| Webhook | POST your workspace to an external URL (optional) |
+| GSheet Sync | Sync your workspace and back up data in the cloud (optional) |
 
 ---
 
-## 🔒 Privacy
-
-All data is stored in `chrome.storage.local` and never leaves your device by default. No analytics, no tracking, no cloud.
+All data is stored in `chrome.storage.local` and never leaves your device by default unless you configure Google Sheets Cloud Sync. No analytics, no tracking, no third-party cloud.
 
 ---
 
