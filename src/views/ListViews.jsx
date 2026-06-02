@@ -4,176 +4,225 @@ import { Btn } from '../components/Btn';
 import { palFor, campaignPhones, CAMP_PAL } from '../utils/utils';
 
 export function ListsView({ lists, contacts, settings, search, onEdit, onDelete, onFilter }) {
-  const filtered = lists.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true}));
+  const [inactiveExpanded, setInactiveExpanded] = useState(false);
+  const filtered = lists.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase()));
+  const activeLists = filtered.filter(l => l.status !== 'inactive').sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true}));
+  const inactiveLists = filtered.filter(l => l.status === 'inactive').sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true}));
+
   if (!filtered.length) return <Empty icon="📋" text={"No lists yet.\nClick + Create List to get started."} />;
 
-  return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff' }}>
-      {filtered.map(list => {
-        const assigned = contacts.filter(c => (c.lists || []).some(e => e.listId === list.id));
-        const bk = {};
-        assigned.forEach(c => { const e = (c.lists || []).find(e => e.listId === list.id); if (e?.status) bk[e.status] = (bk[e.status] || 0) + 1; });
+  const renderListCard = (list) => {
+    const assigned = contacts.filter(c => (c.lists || []).some(e => e.listId === list.id));
+    const bk = {};
+    assigned.forEach(c => { const e = (c.lists || []).find(e => e.listId === list.id); if (e?.status) bk[e.status] = (bk[e.status] || 0) + 1; });
 
-        return (
-          <div 
-            key={list.id} 
-            style={{ 
-              background: '#ffffff', 
-              border: `1px solid #e2e8f0`, 
-              borderRadius: '10px', 
-              padding: '14px 20px', 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '24px',
-              transition: 'all 0.15s ease',
-              cursor: 'default'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
-          >
-            {/* Left Content Column */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: 0 }}>
-              
-              {/* Title & Description Stack */}
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                  <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', fontFamily: 'Inter,sans-serif', lineHeight: '1.4' }}>{list.name}</span>
-                  <span style={{ 
-                    flexShrink: 0, 
-                    fontSize: '11px', 
-                    fontWeight: 700, 
-                    color: '#475569', 
-                    background: '#e2e8f0', 
-                    padding: '2px 7px', 
-                    borderRadius: '4px', 
-                    fontFamily: 'Inter,sans-serif',
-                    fontVariantNumeric: 'tabular-nums',
-                    marginTop: '2px'
-                  }}>
-                    {assigned.length} contact{assigned.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div style={{ 
-                  fontSize: '12.5px', 
-                  color: '#64748b', 
-                  lineHeight: '1.4', 
-                  wordBreak: 'break-word', 
-                  fontFamily: 'Inter,sans-serif',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {list.description || 'No description provided.'}
-                </div>
+    return (
+      <div 
+        key={list.id} 
+        style={{ 
+          background: '#ffffff', 
+          border: `1px solid #e2e8f0`, 
+          borderRadius: '10px', 
+          padding: '14px 20px', 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '24px',
+          transition: 'all 0.15s ease',
+          cursor: 'default'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = '#f8fafc';
+          e.currentTarget.style.borderColor = '#cbd5e1';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = '#ffffff';
+          e.currentTarget.style.borderColor = '#e2e8f0';
+        }}
+      >
+        {/* Left Content Column */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: 0 }}>
+          
+          {/* Title & Description Stack */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14.5px', fontWeight: 700, color: list.status === 'inactive' ? '#64748b' : '#0f172a', fontFamily: 'Inter,sans-serif', lineHeight: '1.4' }}>{list.name}</span>
+                {list.status === 'inactive' && (
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: 1.2 }}>Inactive</span>
+                )}
               </div>
+              <span style={{ 
+                flexShrink: 0, 
+                fontSize: '11px', 
+                fontWeight: 700, 
+                color: '#475569', 
+                background: '#e2e8f0', 
+                padding: '2px 7px', 
+                borderRadius: '4px', 
+                fontFamily: 'Inter,sans-serif',
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: '2px'
+              }}>
+                {assigned.length} contact{assigned.length !== 1 ? 's' : ''}
+              </span>
             </div>
-
-            {/* Middle: Status Distribution tags (horizontal) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, maxWidth: '280px', overflow: 'hidden', flexWrap: 'nowrap' }}>
-              {Object.entries(bk).length > 0 ? (
-                Object.entries(bk).slice(0, 3).map(([st, n]) => {
-                  const [bg, fg] = palFor(st, settings.listStatuses);
-                  return <Badge key={st} text={st + ' · ' + n} bg={bg} fg={fg} />;
-                })
-              ) : (
-                <span style={{ fontSize: '11.5px', color: '#cbd5e1', fontStyle: 'italic' }}>No distribution</span>
-              )}
-              {Object.entries(bk).length > 3 && (
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: '#94a3b8',
-                  padding: '2px'
-                }}>
-                  +{Object.entries(bk).length - 3}
-                </span>
-              )}
-            </div>
-
-            {/* Right: Tactile Action Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <button 
-                onClick={() => onFilter(list.id)}
-                style={{ 
-                  padding: '7px 14px', 
-                  background: '#0f172a', 
-                  color: '#ffffff', 
-                  border: 'none', 
-                  borderRadius: '6px', 
-                  fontFamily: 'Inter,sans-serif', 
-                  fontSize: '12px', 
-                  fontWeight: 700, 
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
-                onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
-              >
-                View
-              </button>
-              
-              <button 
-                onClick={() => onEdit(list)}
-                style={{ 
-                  padding: '6px 12px', 
-                  background: '#ffffff', 
-                  color: '#475569', 
-                  border: '1px solid #e2e8f0', 
-                  borderRadius: '6px', 
-                  fontFamily: 'Inter,sans-serif', 
-                  fontSize: '12px', 
-                  fontWeight: 600, 
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.background = '#f8fafc';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.background = '#ffffff';
-                }}
-              >
-                Edit
-              </button>
-
-              <button 
-                onClick={() => onDelete(list.id)}
-                style={{ 
-                  padding: '6px 10px', 
-                  background: 'transparent', 
-                  color: '#94a3b8', 
-                  border: 'none', 
-                  borderRadius: '6px', 
-                  fontFamily: 'Inter,sans-serif', 
-                  fontSize: '12px', 
-                  fontWeight: 600, 
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = '#475569';
-                  e.currentTarget.style.background = '#f1f5f9';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = '#94a3b8';
-                  e.currentTarget.style.background = 'transparent';
-                }}
-              >
-                Delete
-              </button>
+            <div style={{ 
+              fontSize: '12.5px', 
+              color: '#64748b', 
+              lineHeight: '1.4', 
+              wordBreak: 'break-word', 
+              fontFamily: 'Inter,sans-serif',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {list.description || 'No description provided.'}
             </div>
           </div>
-        );
-      })}
+        </div>
+
+        {/* Middle: Status Distribution tags (horizontal) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, maxWidth: '280px', overflow: 'hidden', flexWrap: 'nowrap' }}>
+          {Object.entries(bk).length > 0 ? (
+            Object.entries(bk).slice(0, 3).map(([st, n]) => {
+              const [bg, fg] = palFor(st, settings.listStatuses);
+              return <Badge key={st} text={st + ' · ' + n} bg={bg} fg={fg} />;
+            })
+          ) : (
+            <span style={{ fontSize: '11.5px', color: '#cbd5e1', fontStyle: 'italic' }}>No distribution</span>
+          )}
+          {Object.entries(bk).length > 3 && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#94a3b8',
+              padding: '2px'
+            }}>
+              +{Object.entries(bk).length - 3}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Tactile Action Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <button 
+            onClick={() => onFilter(list.id)}
+            style={{ 
+              padding: '7px 14px', 
+              background: '#0f172a', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '6px', 
+              fontFamily: 'Inter,sans-serif', 
+              fontSize: '12px', 
+              fontWeight: 700, 
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+            onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
+          >
+            View
+          </button>
+          
+          <button 
+            onClick={() => onEdit(list)}
+            style={{ 
+              padding: '6px 12px', 
+              background: '#ffffff', 
+              color: '#475569', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '6px', 
+              fontFamily: 'Inter,sans-serif', 
+              fontSize: '12px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.background = '#f8fafc';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = '#e2e8f0';
+              e.currentTarget.style.background = '#ffffff';
+            }}
+          >
+            Edit
+          </button>
+
+          <button 
+            onClick={() => onDelete(list.id)}
+            style={{ 
+              padding: '6px 10px', 
+              background: 'transparent', 
+              color: '#94a3b8', 
+              border: 'none', 
+              borderRadius: '6px', 
+              fontFamily: 'Inter,sans-serif', 
+              fontSize: '12px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#475569';
+              e.currentTarget.style.background = '#f1f5f9';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = '#94a3b8';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#ffffff' }}>
+      {/* Active Lists */}
+      {activeLists.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {inactiveLists.length > 0 && (
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+              🟢 Active Lists ({activeLists.length})
+            </div>
+          )}
+          {activeLists.map(renderListCard)}
+        </div>
+      )}
+
+      {/* Inactive Lists */}
+      {inactiveLists.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: activeLists.length > 0 ? '10px' : '0px' }}>
+          <div 
+            onClick={() => setInactiveExpanded(prev => !prev)}
+            style={{ 
+              fontSize: '11px', 
+              fontWeight: 800, 
+              color: '#64748b', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.8px', 
+              marginBottom: '4px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              cursor: 'pointer',
+              userSelect: 'none',
+              width: 'max-content'
+            }}
+          >
+            ⚫ Inactive Lists ({inactiveLists.length})
+            <span style={{ fontSize: '10px', fontWeight: 400, textTransform: 'none', color: '#94a3b8', letterSpacing: 'normal' }}>(hidden in selectors)</span>
+            <span style={{ fontSize: '12px', color: '#94a3b8', display: 'inline-block', transition: 'transform 0.15s ease', transform: inactiveExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+          </div>
+          {inactiveExpanded && inactiveLists.map(renderListCard)}
+        </div>
+      )}
     </div>
   );
 }

@@ -152,7 +152,7 @@ export function App({ togBtn }) {
       listId: l.id,
       name: l.name,
       description: l.description || '',
-      status: 'Active'
+      status: l.status === 'inactive' ? 'Inactive' : 'Active'
     }));
 
     let totalSent = 0;
@@ -189,7 +189,10 @@ export function App({ togBtn }) {
       const sheetLists = (listRes.lists || []).map(l => ({
         id: l.listId,
         name: l.name,
-        description: l.description || ''
+        description: l.description || '',
+        status: l.status === 'Inactive' ? 'inactive' : 'active',
+        createdAt: l.createdAt || l.created_at,
+        modifiedAt: l.modifiedAt || l.modified_at
       }));
 
       console.log('Sync Phase 2: Fetching contacts...');
@@ -219,8 +222,20 @@ export function App({ togBtn }) {
       let updatedLists = [...lists];
       sheetLists.forEach(sl => {
         const idx = updatedLists.findIndex(l => l.id === sl.id);
-        if (idx >= 0) updatedLists[idx] = sl;
-        else updatedLists.push(sl);
+        if (idx >= 0) {
+          updatedLists[idx] = {
+            ...updatedLists[idx],
+            ...sl,
+            status: sl.status || updatedLists[idx].status || 'active',
+            createdAt: sl.createdAt || updatedLists[idx].createdAt,
+            modifiedAt: sl.modifiedAt || updatedLists[idx].modifiedAt
+          };
+        } else {
+          updatedLists.push({
+            status: 'active',
+            ...sl
+          });
+        }
       });
 
       let updatedContacts = [...contacts];
@@ -638,7 +653,7 @@ export function App({ togBtn }) {
         style.id = 'vcrm-layout-style';
         document.head.appendChild(style);
       }
-      style.textContent = `gv-call-sidebar, .gb_v.gb_we { display: none !important; }`;
+      style.textContent = `gv-call-sidebar, .gb_v.gb_we, .app-banner-container { display: none !important; }`;
     } else if (style) {
       style.textContent = '';
     }
@@ -909,7 +924,7 @@ export function App({ togBtn }) {
                     ['All memberships', setFilterMembershipLevel, filterMembershipLevel, settings.membershipLevels || []],
                     ['All sources', setFilterLeadSource, filterLeadSource, settings.leadSources || []],
                     ['All categories', setFilterCategory, filterCategory, settings.categories || []],
-                    ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
+                    ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
                     ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
                     ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
                   ].map(([placeholder, setter, val, opts], i) => (
@@ -1007,7 +1022,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Add to List…</option>
-                    {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   {/* Remove from List */}
@@ -1017,7 +1032,7 @@ export function App({ togBtn }) {
                     e.target.value = '';
                   }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
                     <option value="">Remove from List…</option>
-                    {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
 
                   <button onClick={() => {

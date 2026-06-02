@@ -17,7 +17,11 @@ export function loadData(cb) {
         membershipLevel: '',
         ...c
       }));
-    const lists = d.vcrm_lists || [];
+    const lists = (d.vcrm_lists || [])
+      .map(l => ({
+        status: 'active',
+        ...l
+      }));
     const campaigns = d.vcrm_campaigns || [];
     const forms = d.vcrm_forms || [];
     const rawS = d.vcrm_settings;

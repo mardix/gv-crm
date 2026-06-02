@@ -8,18 +8,103 @@ export function ListModal({ list, onSave, onClose }) {
   const isNew = !list;
   const [name, setName] = useState(list?.name || '');
   const [desc, setDesc] = useState(list?.description || '');
+  const [status, setStatus] = useState(list?.status || 'active');
+
+  const formatDate = (isoString) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return isoString;
+    }
+  };
+
   const footer = (
     <>
       <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      <Btn variant="primary" onClick={() => { if (!name.trim()) { alert('Name required'); return; } onSave({ ...(list || {}), id: list?.id || uid(), name, description: desc }); }}>
+      <Btn variant="primary" onClick={() => {
+        if (!name.trim()) { alert('Name required'); return; }
+        onSave({
+          ...(list || {}),
+          id: list?.id || uid(),
+          name,
+          description: desc,
+          status,
+          createdAt: list?.createdAt || new Date().toISOString(),
+          modifiedAt: new Date().toISOString()
+        });
+      }}>
         {isNew ? 'Create List' : 'Save'}
       </Btn>
     </>
   );
+
   return (
     <Modal title={isNew ? 'New List' : 'Edit List'} onClose={onClose} footer={footer}>
-      <Field label="List Name"><Input value={name} onInput={e => setName(e.target.value)} placeholder="e.g. Summer Event 2025" /></Field>
-      <Field label="Description"><Textarea value={desc} onInput={e => setDesc(e.target.value)} placeholder="What is this list for?" /></Field>
+      <Field label="List Name">
+        <Input value={name} onInput={e => setName(e.target.value)} placeholder="e.g. Summer Event 2025" />
+      </Field>
+      <Field label="Description">
+        <Textarea value={desc} onInput={e => setDesc(e.target.value)} placeholder="What is this list for?" />
+      </Field>
+
+      <Field label="List Status">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+          <button
+            type="button"
+            onClick={() => setStatus(status === 'active' ? 'inactive' : 'active')}
+            style={{
+              position: 'relative',
+              width: '46px',
+              height: '24px',
+              borderRadius: '99px',
+              background: status === 'active' ? '#10b981' : '#cbd5e1',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              padding: 0,
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: status === 'active' ? 'translateX(24px)' : 'translateX(4px)'
+              }}
+            />
+          </button>
+          <span style={{ fontSize: '13.5px', fontWeight: 600, color: status === 'active' ? '#10b981' : '#64748b' }}>
+            {status === 'active' ? '✓ Active' : '✕ Inactive'}
+          </span>
+        </div>
+      </Field>
+
+      {!isNew && (
+        <div style={{ display: 'flex', gap: '16px', marginTop: '16px', background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Created At</div>
+            <div style={{ fontSize: '12.5px', color: '#0f172a', fontWeight: 500 }}>{formatDate(list?.createdAt)}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Last Modified</div>
+            <div style={{ fontSize: '12.5px', color: '#0f172a', fontWeight: 500 }}>{formatDate(list?.modifiedAt)}</div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -125,7 +210,7 @@ export function CampaignModal({ campaign, lists, settings, contacts, onSave, onD
         {!lists.length
           ? <p style={{ color: "#94a3b8", fontSize: '13px' }}>No lists yet — create lists first.</p>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
+            {lists.filter(l => l.status !== 'inactive' || normalizedSelections.some(s => s.listId === l.id)).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
               const selection = normalizedSelections.find(s => s.listId === list.id);
               const sel = !!selection;
               const pc = campaignPhones([selection || list.id], contacts).length;
@@ -135,7 +220,12 @@ export function CampaignModal({ campaign, lists, settings, contacts, onSave, onD
                   <div onClick={() => handleToggleList(list.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 18px', cursor: 'pointer', flex: 1, boxSizing: 'border-box', width: '100%' }}>
                     <input type="checkbox" checked={sel} onChange={() => handleToggleList(list.id)} onClick={e => e.stopPropagation()} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: "#4f46e5", cursor: 'pointer', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '15.5px', fontWeight: 800, color: "#0f172a", lineHeight: '1.3', wordBreak: 'break-word' }}>{list.name}</div>
+                      <div style={{ fontSize: '15.5px', fontWeight: 800, color: list.status === 'inactive' ? "#64748b" : "#0f172a", lineHeight: '1.3', wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {list.name}
+                        {list.status === 'inactive' && (
+                          <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#e2e8f0', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Inactive</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: '12.5px', color: "#64748b", fontWeight: 500, marginTop: '4px', lineHeight: '1.4' }}>{pc} contact{pc !== 1 ? 's' : ''} targeted</div>
                     </div>
                   </div>
@@ -191,7 +281,7 @@ export function SyncSidebarModal({ lists, settings, onSync, onClose }) {
           <p style={{ fontSize: '13px', color: '#94a3b8' }}>No lists yet — you can create lists in the Lists tab.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {lists.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
+            {lists.filter(l => l.status !== 'inactive').slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, {numeric:true})).map(list => {
               const sel = selectedIds.includes(list.id);
               return (
                 <div

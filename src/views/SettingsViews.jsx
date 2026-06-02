@@ -744,7 +744,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
           <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: '8px' }}>Select Data Source</label>
           <select value={scope} onChange={e => setScope(e.target.value)} style={{ display: 'block', width: '100%', padding: '11px 36px 11px 15px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', background: `#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center`, transition: 'all 0.15s ease' }}>
             <option value="all">All contacts ({contacts.length})</option>
-            {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name} ({contacts.filter(c => (c.lists || []).some(e => e.listId === l.id)).length})</option>)}
+            {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}{l.status === 'inactive' ? ' (Inactive)' : ''} ({contacts.filter(c => (c.lists || []).some(e => e.listId === l.id)).length})</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -763,7 +763,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
             1. Add to Lists (Optional)
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => {
+            {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => {
               const sel = selectedListIds.includes(l.id);
               return (
                 <button key={l.id} onClick={() => setSelectedListIds(p => sel ? p.filter(x => x !== l.id) : [...p, l.id])}

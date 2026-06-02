@@ -95,17 +95,17 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
 
             {/* Premium Initials Avatar + Name & Phone stack */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                width: '38px', 
-                height: '38px', 
-                borderRadius: '50%', 
-                background: avatarColor(contact?.name || activeContact.contactName || 'New Contact'), 
-                color: '#fff', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                fontWeight: 700, 
-                fontSize: '13px', 
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: avatarColor(contact?.name || activeContact.contactName || 'New Contact'),
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '13px',
                 fontFamily: '"Outfit",sans-serif',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                 flexShrink: 0
@@ -115,6 +115,7 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: 1.2, wordBreak: 'break-word' }}>
                   {contact?.name || activeContact.contactName || 'New Contact'}
+                  {contact?.handle ? <span style={{ fontSize: '14px', fontWeight: '400' }}> / {contact.handle}</span> : ''}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
@@ -144,13 +145,13 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
                     {contact.leadSource && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
                         <span style={{ color: '#64748b', fontWeight: 600 }}>Source</span>
-                        <span style={{ 
-                          fontWeight: 700, 
-                          color: '#166534', 
-                          background: '#f0fdf4', 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          fontSize: '10px', 
+                        <span style={{
+                          fontWeight: 700,
+                          color: '#166534',
+                          background: '#f0fdf4',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
                           textTransform: 'uppercase',
                           border: '1px solid #bbf7d0'
                         }}>{contact.leadSource}</span>
@@ -160,13 +161,13 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
                     {contact.category && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
                         <span style={{ color: '#64748b', fontWeight: 600 }}>Category</span>
-                        <span style={{ 
-                          fontWeight: 700, 
-                          color: '#5b21b6', 
-                          background: '#f5f3ff', 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          fontSize: '10px', 
+                        <span style={{
+                          fontWeight: 700,
+                          color: '#5b21b6',
+                          background: '#f5f3ff',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
                           textTransform: 'uppercase',
                           border: '1px solid #ddd6fe'
                         }}>{contact.category}</span>
@@ -182,11 +183,11 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
                   </div>
                 )}
                 {contact.lists?.length > 0 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '6px', 
-                    maxHeight: '110px', 
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    maxHeight: '110px',
                     overflowY: 'auto',
                     paddingRight: '2px'
                   }}>

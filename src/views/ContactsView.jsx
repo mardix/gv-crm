@@ -1,14 +1,21 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { Badge } from '../components/Badge';
 import { palFor, avatarColor, ini } from '../utils/utils';
 
 export function ContactsView({ contacts, lists, settings, search, filterStatus, filterListId, filterListStatus, filterTag, filterMembershipLevel, filterLeadSource, filterCategory, sortCol, sortDir, onSort, onEdit, selectedIds, onSelect, onOpenMessage, freezeCols }) {
   const [page, setPage] = useState(1);
+  const containerRef = useRef(null);
   const PAGE_SIZE = 100;
 
   useEffect(() => {
     setPage(1);
   }, [search, filterStatus, filterListId, filterListStatus, filterTag, filterMembershipLevel, filterLeadSource, filterCategory, sortCol, sortDir]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [page]);
 
   const rows = contacts.filter(c => {
     if (filterStatus && c.status !== filterStatus) return false;
@@ -93,7 +100,7 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
   };
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `0 24px ${totalPages > 1 ? '0px' : '24px'} 24px`, background: '#f8fafc' }}>
+    <div ref={containerRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `0 24px ${totalPages > 1 ? '0px' : '24px'} 24px`, background: '#f8fafc' }}>
       <div style={{ height: '20px' }} />
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px', marginTop: '-8px', tableLayout: 'fixed', fontSize: '12.5px' }}>
         <colgroup>{colW.map((w, i) => <col key={i} style={{ width: w }} />)}
