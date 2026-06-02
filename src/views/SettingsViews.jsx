@@ -532,14 +532,10 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
 
   return (
     <>
-      <SettingsCard title="💾 State Backup & Restore" desc="Securely save your entire workspace state to Google Sheets or backup locally as a JSON file.">
-        <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e', lineHeight: 1.6, fontWeight: 500 }}>
-          ⚠️ <strong>Loading or restoring a state backup will completely overwrite your current local data.</strong> Make sure to download or create a backup first.
-        </div>
-
+      <SettingsCard title="💾 State Backup" desc="Securely save your entire workspace state to Google Sheets or backup locally as a JSON file.">
         {!gsheetUrl ? (
           <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
-            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud backup and restore.
+            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud backup snapshots.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -634,96 +630,113 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
                 </div>
               )}
             </div>
-
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px' }}>
-                Restore from Google Sheets Snapshot
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  placeholder="Paste Snapshot ID (e.g. APPSTATE-2026-05-31)"
-                  value={inputSnapshotId}
-                  onInput={e => setInputSnapshotId(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 14px',
-                    border: '1.5px solid #cbd5e1',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    outline: 'none',
-                    fontFamily: '"DM Mono",monospace',
-                    background: '#fff',
-                    color: '#0f172a'
-                  }}
-                  onFocus={e => { e.target.style.borderColor = "#4f46e5"; }}
-                  onBlur={e => { e.target.style.borderColor = "#cbd5e1"; }}
-                />
-                <button
-                  disabled={gsheetRestoreLoading || !inputSnapshotId.trim()}
-                  onClick={() => {
-                    setGsheetRestoreLoading(true);
-                    setGsheetRestoreError('');
-                    onGSheetRestore(
-                      inputSnapshotId,
-                      () => {
-                        setGsheetRestoreLoading(false);
-                        setInputSnapshotId('');
-                      },
-                      (err) => {
-                        setGsheetRestoreLoading(false);
-                        setGsheetRestoreError(err);
-                      }
-                    );
-                  }}
-                  style={{
-                    padding: '0 16px',
-                    background: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? '#cbd5e1' : '#4f46e5',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? 'default' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {gsheetRestoreLoading ? 'Restoring...' : 'Restore'}
-                </button>
-              </div>
-              {gsheetRestoreError && (
-                <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
-                  ❌ Restore Failed: {gsheetRestoreError}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-          <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Backup & Restore</span>
+          <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Backup</span>
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button
-            onClick={onDownloadState}
-            style={{ flex: 1, minWidth: '140px', padding: '14px 0', borderRadius: '10px', border: '1.5px solid #4f46e544', background: '#f5f3ff', color: '#4f46e5', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
-          >
-            ⬇ Download State JSON
-          </button>
-          <label style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 0', borderRadius: '10px', border: '1.5px solid #9333ea44', background: '#faf5ff', color: '#9333ea', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}>
-            ⬆ Load State JSON
-            <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
-              const file = e.target.files[0]; if (!file) return;
-              const reader = new FileReader();
-              reader.onload = ev => onLoadState && onLoadState(ev.target.result);
-              reader.readAsText(file);
-              e.target.value = '';
-            }} />
-          </label>
+        <button
+          onClick={onDownloadState}
+          style={{ width: '100%', padding: '14px 0', borderRadius: '10px', border: '1.5px solid #4f46e544', background: '#f5f3ff', color: '#4f46e5', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
+        >
+          ⬇ Download State JSON
+        </button>
+      </SettingsCard>
+
+      <SettingsCard title="🔄 State Restore" desc="Restore your workspace state from a Google Sheets snapshot or a local JSON file.">
+        <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e', lineHeight: 1.6, fontWeight: 500, marginBottom: '16px' }}>
+          ⚠️ <strong>Warning: Loading or restoring a state backup will completely overwrite your current local data (contacts, lists, campaigns, forms, settings).</strong> Make sure to download or create a backup first.
         </div>
+
+        {!gsheetUrl ? (
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
+            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud snapshot restores.
+          </div>
+        ) : (
+          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px' }}>
+              Restore from Google Sheets Snapshot
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="Paste Snapshot ID (e.g. APPSTATE-2026-05-31)"
+                value={inputSnapshotId}
+                onInput={e => setInputSnapshotId(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  fontFamily: '"DM Mono",monospace',
+                  background: '#fff',
+                  color: '#0f172a'
+                }}
+                onFocus={e => { e.target.style.borderColor = "#4f46e5"; }}
+                onBlur={e => { e.target.style.borderColor = "#cbd5e1"; }}
+              />
+              <button
+                disabled={gsheetRestoreLoading || !inputSnapshotId.trim()}
+                onClick={() => {
+                  setGsheetRestoreLoading(true);
+                  setGsheetRestoreError('');
+                  onGSheetRestore(
+                    inputSnapshotId,
+                    () => {
+                      setGsheetRestoreLoading(false);
+                      setInputSnapshotId('');
+                    },
+                    (err) => {
+                      setGsheetRestoreLoading(false);
+                      setGsheetRestoreError(err);
+                    }
+                  );
+                }}
+                style={{
+                  padding: '0 16px',
+                  background: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? '#cbd5e1' : '#4f46e5',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? 'default' : 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {gsheetRestoreLoading ? 'Restoring...' : 'Restore'}
+              </button>
+            </div>
+            {gsheetRestoreError && (
+              <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                ❌ Restore Failed: {gsheetRestoreError}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Restore</span>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 0', borderRadius: '10px', border: '1.5px solid #9333ea44', background: '#faf5ff', color: '#9333ea', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}>
+          ⬆ Load State JSON
+          <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => onLoadState && onLoadState(ev.target.result);
+            reader.readAsText(file);
+            e.target.value = '';
+          }} />
+        </label>
       </SettingsCard>
 
       <SettingsCard title="↑ Export Data" desc="Download your contacts or a specific list as professional CSV or JSON files.">
