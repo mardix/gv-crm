@@ -36,6 +36,12 @@ export const STYLE = `
     100% { box-shadow: 0 0 0 2px rgba(139,92,246,0.7), 0 0 24px 6px rgba(139,92,246,0.25), 0 16px 40px -8px rgba(15,23,42,0.14); }
   }
 
+  @keyframes vcrm-sync-pulse {
+    0%   { opacity: 0.45; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.45; }
+  }
+
   .vcrm-widget,
   #vcrm-open-btn,
   #vcrm-panel {

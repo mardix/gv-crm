@@ -46,6 +46,20 @@ export function App({ togBtn }) {
   const [sortDir, setSortDir] = useState('asc');
   const [bulkSelCollapsed, setBulkSelCollapsed] = useState(false);
 
+  const [syncing, setSyncing] = useState(false);
+  const isWorking = syncing || activeCampaignStatus !== null;
+
+  useEffect(() => {
+    if (!togBtn) return;
+    if (isWorking) {
+      togBtn.style.setProperty('animation', 'vcrm-pulse-shadow 1.2s ease-in-out infinite', 'important');
+      togBtn.style.setProperty('transform', 'translateY(-50%) translateX(-4px)', 'important');
+    } else {
+      togBtn.style.setProperty('animation', 'vcrm-pulse-shadow 4s ease-in-out infinite', 'important');
+      togBtn.style.setProperty('transform', 'translateY(-50%)', 'important');
+    }
+  }, [isWorking, togBtn]);
+
   const [freezeCols, setFreezeCols] = useState(() => {
     try {
       return localStorage.getItem('vcrm_freeze_cols') === 'true';
@@ -165,6 +179,7 @@ export function App({ togBtn }) {
     const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
     if (!ok) return;
 
+    setSyncing(true);
     try {
       // PHASE 1: FETCH (Pull & Merge)
       console.log('Sync Phase 1: Fetching lists...');
@@ -229,6 +244,8 @@ export function App({ togBtn }) {
       }
     } catch (err) {
       alert('GSheet Sync Error: ' + err.message);
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -487,6 +504,7 @@ export function App({ togBtn }) {
       alert('Please enter an Apps Script URL in Settings first.');
       return;
     }
+    setSyncing(true);
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const snapshotName = `APPSTATE-${todayStr}`;
@@ -504,6 +522,8 @@ export function App({ togBtn }) {
     } catch (err) {
       console.error(err);
       onError(err.message);
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -519,6 +539,7 @@ export function App({ togBtn }) {
     const ok = confirm('⚠️ Are you sure you want to restore from this snapshot? This will completely overwrite your current local data (contacts, lists, campaigns, forms, settings).');
     if (!ok) return;
 
+    setSyncing(true);
     try {
       const res = await sendGSheetAction('readDataSnapshot', { snapshotId }, 'GET');
       if (res && res.ok && res.snapshot) {
@@ -538,6 +559,8 @@ export function App({ togBtn }) {
     } catch (err) {
       console.error(err);
       onError(err.message);
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -679,7 +702,36 @@ export function App({ togBtn }) {
               GV
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
+                {isWorking && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    color: activeCampaignStatus ? '#fed7aa' : '#a7f3d0',
+                    background: activeCampaignStatus ? 'rgba(249, 115, 22, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                    border: activeCampaignStatus ? '1px solid rgba(249, 115, 22, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '99px',
+                    padding: '2px 8px',
+                    animation: 'vcrm-sync-pulse 1.5s infinite ease-in-out',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    lineHeight: 'normal'
+                  }}>
+                    <span style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: activeCampaignStatus ? '#f97316' : '#10b981',
+                      boxShadow: activeCampaignStatus ? '0 0 6px #f97316' : '0 0 6px #10b981'
+                    }} />
+                    {activeCampaignStatus ? 'Campaign' : 'Syncing'}
+                  </span>
+                )}
+              </div>
               <div style={{
                 display: 'inline-flex',
                 fontSize: '9px',
