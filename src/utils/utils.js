@@ -48,7 +48,18 @@ export function campaignPhones(selections, contacts) {
         const p = c.phone.trim();
         if (!seen.has(p)) {
           seen.add(p);
-          phones.push({ phone: p, name: c.name || '', email: c.email || '', handle: c.handle || '' });
+          phones.push({
+            id: c.id,
+            phone: p,
+            name: c.name || '',
+            email: c.email || '',
+            handle: c.handle || '',
+            location: c.location || '',
+            status: c.status || '',
+            leadSource: c.leadSource || '',
+            category: c.category || '',
+            membershipLevel: c.membershipLevel || ''
+          });
         }
       });
   });

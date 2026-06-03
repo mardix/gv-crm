@@ -276,7 +276,7 @@ function downloadReport(camp, totalCount, livePhones) {
 }
 
 
-export function CampaignsView({ campaigns, contacts, lists, activeStatus, onEdit, onUpdate, onDelete, onDuplicate }) {
+export function CampaignsView({ campaigns, contacts, lists, activeStatus, isStandalone, forms = [], onEdit, onUpdate, onDelete, onDuplicate }) {
   const [expandedId, setExpandedId] = useState(null);
   const [reportExpandedId, setReportExpandedId] = useState(null);
 
@@ -370,13 +370,56 @@ export function CampaignsView({ campaigns, contacts, lists, activeStatus, onEdit
                   </div>
                 )}
 
-                {camp.message && (
+                {camp.type === 'form' ? (
                   <div style={{ padding: '24px 28px', borderBottom: `1px solid #f1f5f9`, background: '#fdfdfe' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Message Configuration</span>
+                    <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Form Campaign Configuration</span>
                     <div style={{ padding: '16px', background: '#fff', border: '1px solid #eef2f6', borderRadius: '12px', color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                      "{camp.message}"
+                      Target Form: <strong style={{ color: '#0f172a' }}>{(() => {
+                        const f = forms.find(x => x.id === camp.formId);
+                        return f ? f.name : 'Deleted Form';
+                      })()}</strong>
                     </div>
-                    {camp.imageDataUrl && <div style={{ marginTop: '20px' }}><img src={camp.imageDataUrl} style={{ maxWidth: '160px', borderRadius: '12px', border: '1px solid #eef2f6', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} /></div>}
+                  </div>
+                ) : (
+                  camp.message && (
+                    <div style={{ padding: '24px 28px', borderBottom: `1px solid #f1f5f9`, background: '#fdfdfe' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Message Configuration</span>
+                      <div style={{ padding: '16px', background: '#fff', border: '1px solid #eef2f6', borderRadius: '12px', color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
+                        "{camp.message}"
+                      </div>
+                      {camp.imageDataUrl && <div style={{ marginTop: '20px' }}><img src={camp.imageDataUrl} style={{ maxWidth: '160px', borderRadius: '12px', border: '1px solid #eef2f6', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} /></div>}
+                    </div>
+                  )
+                )}
+
+                {isStandalone && (!camp.type || camp.type === 'sms') && (camp.status === 'draft' || camp.status === 'ready' || showAsPaused || (failed > 0 && camp.status !== 'running')) && (
+                  <div style={{ padding: '20px 28px', borderBottom: `1px solid #fef3c7`, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '18px' }}>📣</span>
+                      <div style={{ fontSize: '13px', color: '#92400e', fontWeight: 700, textAlign: 'left', lineHeight: 1.4 }}>
+                        Campaigns must be launched or resumed from the Google Voice interface. Please open Google Voice to proceed.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#d97706',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
+                        transition: 'all 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#b45309'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#d97706'}
+                    >
+                      Go to Google Voice ↗
+                    </button>
                   </div>
                 )}
 
@@ -486,18 +529,55 @@ export function CampaignsView({ campaigns, contacts, lists, activeStatus, onEdit
 
                 <div style={{ padding: '24px 28px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', background: '#fff' }}>
                   {(camp.status === 'draft' || camp.status === 'ready' || showAsPaused) && <Btn variant="sm" onClick={() => onEdit(camp)} style={{ padding: '10px 20px' }}>Edit</Btn>}
-                  {(camp.status === 'draft' || camp.status === 'ready') && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'start')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Launch</Btn>}
+                  {(camp.status === 'draft' || camp.status === 'ready') && (
+                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                      <Btn
+                        variant="sm"
+                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
+                        title="Campaigns must be launched from the Google Voice page"
+                      >
+                        ⚠️ Open GV to Launch
+                      </Btn>
+                    ) : (
+                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'start')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Launch</Btn>
+                    )
+                  )}
 
                   {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'pause')} style={{ padding: '10px 20px', color: "#64748b" }}>⏸ Pause</Btn>}
                   {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
 
-                  {showAsPaused && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'resume')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Resume</Btn>}
+                  {showAsPaused && (
+                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                      <Btn
+                        variant="sm"
+                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
+                        title="Campaigns must be resumed from the Google Voice page"
+                      >
+                        ⚠️ Open GV to Resume
+                      </Btn>
+                    ) : (
+                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'resume')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Resume</Btn>
+                    )
+                  )}
                   {showAsPaused && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
 
                   <Btn variant="sm" onClick={() => onDuplicate(camp)} style={{ padding: '10px 20px', color: '#4f46e5', borderColor: '#c7d2fe', background: '#f5f7ff' }}>❐ Duplicate</Btn>
 
                   {failed > 0 && camp.status !== 'running' && (
-                    <Btn variant="sm" onClick={() => onUpdate(camp.id, 'retry-failed')} style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}>↺ Retry {failed} Failed</Btn>
+                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                      <Btn
+                        variant="sm"
+                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
+                        title="Campaign retries must be launched from the Google Voice page"
+                      >
+                        ⚠️ Open GV to Retry
+                      </Btn>
+                    ) : (
+                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'retry-failed')} style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}>↺ Retry {failed} Failed</Btn>
+                    )
                   )}
 
                   <Btn variant="sm" onClick={() => onDelete(camp.id)} style={{ marginLeft: 'auto', color: "#94a3b8", border: 'none', background: 'none', fontSize: '12px' }}>🗑 Delete</Btn>

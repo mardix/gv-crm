@@ -91,12 +91,13 @@ export function App({ togBtn }) {
 
 
 
-  function sendGSheetAction(action, payload, method = 'POST') {
-    if (!settings.gsheetUrl) return Promise.resolve({ ok: false, error: 'No GSheet URL' });
+  function sendGSheetAction(action, payload, method = 'POST', customUrl = null) {
+    const url = customUrl || settings.gsheetUrl;
+    if (!url) return Promise.resolve({ ok: false, error: 'No GSheet URL' });
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'gsheetAction',
-        url: settings.gsheetUrl,
+        url,
         method,
         payload: { action, ...payload }
       }, (res) => resolve(res || { ok: false, error: 'No response' }));
@@ -217,9 +218,9 @@ export function App({ togBtn }) {
         if (detailRes.ok && detailRes.snapshot && detailRes.snapshot.data) {
           const payload = detailRes.snapshot.data;
           
-          // Merge Settings
+          // Merge Settings (preserve local gsheetUrl)
           if (payload.settings) {
-            setSettings(s => ({ ...s, ...payload.settings }));
+            setSettings(s => ({ ...s, ...payload.settings, gsheetUrl: s.gsheetUrl }));
           }
 
           // Merge Forms (Union by ID)
@@ -264,13 +265,15 @@ export function App({ togBtn }) {
       }
     }
 
-    // Local configuration is newer or none exists on sheet -> upload
+    // Local configuration is newer or none exists on sheet -> upload (exclude gsheetUrl)
     console.log('Local configurations are newer (or none on sheet). Uploading to cloud...');
+    const cleanSettings = { ...settings };
+    delete cleanSettings.gsheetUrl;
     const uploadRes = await sendGSheetAction('saveDataSnapshot', {
       snapshotType: 'CONFIG',
       snapshotName: 'CRM-CONFIG',
       snapshotMode: 'replace',
-      data: { settings, campaigns, forms }
+      data: { settings: cleanSettings, campaigns, forms }
     });
 
     if (uploadRes && uploadRes.ok) {
@@ -287,11 +290,13 @@ export function App({ togBtn }) {
     setSyncing(true);
     try {
       console.log('Manually backing up configurations (Strategy A)...');
+      const cleanSettings = { ...settings };
+      delete cleanSettings.gsheetUrl;
       const uploadRes = await sendGSheetAction('saveDataSnapshot', {
         snapshotType: 'CONFIG',
         snapshotName: 'CRM-CONFIG',
         snapshotMode: 'replace',
-        data: { settings, campaigns, forms }
+        data: { settings: cleanSettings, campaigns, forms }
       });
 
       if (uploadRes && uploadRes.ok) {
@@ -308,10 +313,12 @@ export function App({ togBtn }) {
     }
   }
 
-  async function handleGSheetSync() {
+  async function handleGSheetSync(skipConfirm = false) {
     if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
-    const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
-    if (!ok) return;
+    if (!skipConfirm) {
+      const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
+      if (!ok) return false;
+    }
 
     setSyncing(true);
     try {
@@ -391,14 +398,39 @@ export function App({ togBtn }) {
         console.log('Sync Phase 4: Synchronizing configurations (Strategy A)...');
         await syncConfigurationSnapshots();
 
-        alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.\n- Synchronized Settings, Campaigns, and Forms.`);
+        if (!skipConfirm) {
+          alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.\n- Synchronized Settings, Campaigns, and Forms.`);
+        }
+        return true;
       } else {
         throw new Error(pushRes.error || 'Push phase failed');
       }
     } catch (err) {
       alert('GSheet Sync Error: ' + err.message);
+      return false;
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleOnboardingSetup(mode, url = '', appName = 'GV-CRM') {
+    if (mode === 'local') {
+      setSettings(s => ({ ...s, syncMode: 'local', gsheetUrl: '', appName }));
+      return true;
+    } else {
+      await new Promise(resolve => {
+        setSettings(s => {
+          setTimeout(resolve, 50);
+          return { ...s, gsheetUrl: url, syncMode: 'gsheet', appName };
+        });
+      });
+      const success = await handleGSheetSync(true);
+      if (success) {
+        return true;
+      } else {
+        setSettings(s => ({ ...s, syncMode: undefined }));
+        return false;
+      }
     }
   }
 
@@ -408,7 +440,13 @@ export function App({ togBtn }) {
       setLists(d.lists);
       setCampaigns(d.campaigns);
       setForms(d.forms || []);
-      setSettings(d.settings);
+      
+      const loadedSettings = { ...d.settings };
+      if (!loadedSettings.syncMode) {
+        loadedSettings.syncMode = loadedSettings.gsheetUrl ? 'gsheet' : undefined;
+      }
+      setSettings(loadedSettings);
+      
       setTimeout(() => {
         setLoaded(true);
       }, 100);
@@ -610,6 +648,8 @@ export function App({ togBtn }) {
       chrome.runtime.sendMessage({
         action: 'startCampaign',
         id,
+        type: camp.type || 'sms',
+        form: camp.type === 'form' ? forms.find(f => f.id === camp.formId) : null,
         phones: remaining,
         message: camp.message,
         imageData: camp.imageDataUrl || null,
@@ -648,7 +688,9 @@ export function App({ togBtn }) {
             : null;
 
   function handleDownloadState() {
-    const payload = JSON.stringify({ contacts, lists, campaigns, forms, settings }, null, 2);
+    const cleanSettings = { ...settings };
+    delete cleanSettings.gsheetUrl;
+    const payload = JSON.stringify({ contacts, lists, campaigns, forms, settings: cleanSettings }, null, 2);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
     a.download = `gvcrm-state-${new Date().toISOString().slice(0, 10)}.json`;
@@ -664,7 +706,7 @@ export function App({ togBtn }) {
       if (data.lists && Array.isArray(data.lists)) setLists(data.lists);
       if (data.campaigns && Array.isArray(data.campaigns)) setCampaigns(data.campaigns);
       if (data.forms && Array.isArray(data.forms)) setForms(data.forms);
-      if (data.settings && typeof data.settings === 'object') setSettings(s => ({ ...s, ...data.settings }));
+      if (data.settings && typeof data.settings === 'object') setSettings(s => ({ ...s, ...data.settings, gsheetUrl: s.gsheetUrl }));
       alert('✓ State restored successfully.');
     } catch (e) {
       alert('Failed to load state: ' + e.message);
@@ -699,6 +741,106 @@ export function App({ togBtn }) {
     }
   }
 
+  async function handleDisconnectAndReset() {
+    const confirm1 = confirm(
+      "Are you sure you want to disconnect from Google Sheets and completely reset your CRM database? " +
+      "This will clear all local contacts, campaigns, custom forms, and reset settings to defaults."
+    );
+    if (!confirm1) return;
+
+    // Ask to download a local backup first
+    const confirmBackup = confirm("Would you like to download a local JSON backup of your current CRM state first?");
+    if (confirmBackup) {
+      handleDownloadState();
+    }
+
+    // If connected to Google Sheets, try to create an automatic backup snapshot
+    if (settings.syncMode === 'gsheet' && settings.gsheetUrl) {
+      setSyncing(true);
+      try {
+        const todayStr = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        const appStateSnapshot = `APPSTATE-AUTO-RESET-${todayStr}`;
+        const configSnapshot = `CRM-CONFIG-AUTO-RESET-${todayStr}`;
+
+        console.log('Creating auto-reset backup snapshots on Google Sheets...');
+        
+        // 1. App State snapshot
+        const resState = await sendGSheetAction('saveDataSnapshot', {
+          snapshotType: 'APPSTATE',
+          snapshotName: appStateSnapshot,
+          snapshotMode: 'replace',
+          data: { contacts, lists, campaigns, forms, settings }
+        });
+
+        // 2. CRM Config snapshot (excluding gsheetUrl)
+        const cleanSettings = { ...settings };
+        delete cleanSettings.gsheetUrl;
+        const resConfig = await sendGSheetAction('saveDataSnapshot', {
+          snapshotType: 'CONFIG',
+          snapshotName: configSnapshot,
+          snapshotMode: 'replace',
+          data: { settings: cleanSettings, campaigns, forms }
+        });
+
+        if (resState && resState.ok && resConfig && resConfig.ok) {
+          alert(
+            `✓ Automatic Google Sheets snapshots created successfully:\n` +
+            `- App State: ${appStateSnapshot}\n` +
+            `- CRM Config: ${configSnapshot}`
+          );
+        } else {
+          throw new Error('Google Sheets responded but one or both snapshots failed to save.');
+        }
+      } catch (err) {
+        console.error(err);
+        const proceed = confirm(
+          `⚠️ Failed to create Google Sheets backup snapshots: ${err.message}\n\n` +
+          `Do you want to proceed with the database reset anyway? Your local data will be deleted.`
+        );
+        if (!proceed) {
+          setSyncing(false);
+          return;
+        }
+      } finally {
+        setSyncing(false);
+      }
+    }
+
+    // Perform database reset
+    const defaultSettings = {
+      contactStatuses: ['Active', 'Inactive', 'Banned'],
+      listStatuses: ['Prospect', 'Qualified', 'Unqualified'],
+      membershipLevels: ['Standard', 'Plus', 'Premium', 'VIP', 'Elite'],
+      leadSources: ['Google', 'Referral', 'Social Media', 'Cold Call', 'Other'],
+      categories: ['Client', 'Prospect', 'Partner', 'Vendor'],
+      delayMin: 15,
+      delayMax: 45,
+      gsheetUrl: '',
+      gsheetAuto: false,
+      syncMode: undefined
+    };
+
+    setContacts([]);
+    setLists([]);
+    setCampaigns([]);
+    setForms([]);
+    setSettings(defaultSettings);
+
+    // Save empty state to storage to overwrite it immediately
+    saveData({
+      contacts: [],
+      lists: [],
+      campaigns: [],
+      forms: [],
+      settings: defaultSettings
+    });
+
+    localStorage.removeItem('vcrm_config_modified_at');
+    
+    alert('✓ CRM Database reset complete. Redirecting to onboarding setup.');
+    setView('contacts');
+  }
+
   async function handleGSheetRestore(snapshotId, onSuccess, onError) {
     if (!settings.gsheetUrl) {
       alert('Please enter an Apps Script URL in Settings first.');
@@ -722,7 +864,7 @@ export function App({ togBtn }) {
         if (payload.lists && Array.isArray(payload.lists)) setLists(payload.lists);
         if (payload.campaigns && Array.isArray(payload.campaigns)) setCampaigns(payload.campaigns);
         if (payload.forms && Array.isArray(payload.forms)) setForms(payload.forms);
-        if (payload.settings && typeof payload.settings === 'object') setSettings(s => ({ ...s, ...payload.settings }));
+        if (payload.settings && typeof payload.settings === 'object') setSettings(s => ({ ...s, ...payload.settings, gsheetUrl: s.gsheetUrl }));
 
         onSuccess();
       } else {
@@ -842,6 +984,10 @@ export function App({ togBtn }) {
         overflow: 'hidden',
         pointerEvents: 'auto',
       }}>
+        {!settings.syncMode ? (
+          <WelcomeOnboarding settings={settings} onSetup={handleOnboardingSetup} onClose={!isStandalone ? () => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } } : null} />
+        ) : (
+          <>
 
         {/* ── Premium Dark Glassmorphic Topbar Header ── */}
         <div style={{
@@ -877,7 +1023,7 @@ export function App({ togBtn }) {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>GV-CRM</div>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>{settings.appName || 'GV-CRM'}</div>
                 {isWorking && (
                   <span style={{
                     display: 'inline-flex',
@@ -1218,7 +1364,7 @@ export function App({ togBtn }) {
           }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
           {view === 'campaigns' && (
             <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
-              <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }} onDuplicate={handleDuplicateCampaign} />
+              <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} isStandalone={isStandalone} forms={forms} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }} onDuplicate={handleDuplicateCampaign} />
             </div>
           )}
           {view === 'forms' && (
@@ -1231,9 +1377,11 @@ export function App({ togBtn }) {
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => { setSettings(s => ({ ...s, [k]: v })); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); }} onManualGSheetSync={handleGSheetSync} onManualConfigBackup={handleManualConfigBackup} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => { setSettings(s => ({ ...s, [k]: v })); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); }} onManualGSheetSync={handleGSheetSync} onManualConfigBackup={handleManualConfigBackup} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} onDisconnectAndReset={handleDisconnectAndReset} />}
         </div>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* ── Modals ── */}
       {contactModal && <ContactModal
@@ -1264,7 +1412,7 @@ export function App({ togBtn }) {
       />}
       {campaignModal && <CampaignModal
         campaign={campaignModal === 'new' ? null : campaignModal}
-        lists={lists} contacts={contacts} settings={settings}
+        lists={lists} contacts={contacts} settings={settings} forms={forms}
         onSave={c => { setCampaigns(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setCampaignModal(null); }}
         onDelete={id => { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setCampaignModal(null); }}
         onClose={() => setCampaignModal(null)}
@@ -1285,6 +1433,362 @@ export function App({ togBtn }) {
           settings={settings}
         />
       )}
+    </div>
+  );
+}
+
+export function WelcomeOnboarding({ settings, onSetup, onClose }) {
+  const [step, setStep] = useState('select'); // 'select' | 'gsheet'
+  const [selectedMode, setSelectedMode] = useState(null); // 'local' | 'gsheet'
+  const [appName, setAppName] = useState('GV-CRM');
+  const [gsheetUrl, setGsheetUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSelectMode = (mode) => {
+    setSelectedMode(mode);
+    setError('');
+  };
+
+  const handleContinue = async () => {
+    if (!appName.trim()) {
+      setError('App / Workspace Name is required.');
+      return;
+    }
+    if (selectedMode === 'local') {
+      setLoading(true);
+      await onSetup('local', '', appName.trim());
+      setLoading(false);
+    } else {
+      setStep('gsheet');
+    }
+  };
+
+  const handleConnect = async (e) => {
+    if (e) e.preventDefault();
+    if (!appName.trim()) {
+      setError('App / Workspace Name is required.');
+      return;
+    }
+    if (!gsheetUrl.trim()) {
+      setError('Please enter a valid Google Web App URL.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    
+    const success = await onSetup('gsheet', gsheetUrl.trim(), appName.trim());
+    setLoading(false);
+    if (!success) {
+      setError('Connection failed. Please check the Web App URL and try again.');
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'relative',
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #090514, #120e2e, #090514)',
+      padding: '40px 20px',
+      color: '#fff',
+      overflowY: 'auto'
+    }}>
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            width: '34px',
+            height: '34px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            color: 'rgba(255, 255, 255, 0.7)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
+            zIndex: 10
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = '#ef4444';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.background = '#ef4444';
+            e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
+        </button>
+      )}
+      <div style={{
+        maxWidth: '540px',
+        width: '100%',
+        background: 'rgba(255, 255, 255, 0.03)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: '24px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '40px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center'
+      }}>
+        {/* Logo/Icon */}
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '16px',
+          background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontSize: '20px',
+          fontWeight: 800,
+          boxShadow: '0 0 30px rgba(99, 102, 241, 0.4)',
+          marginBottom: '24px'
+        }}>
+          GV
+        </div>
+
+        {step === 'select' ? (
+          <>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+              Welcome to GV-CRM
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+              Select how you would like to store and synchronize your contacts and customer data.
+            </p>
+
+            <div style={{ marginBottom: '24px', textAlign: 'left', width: '100%' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                App / Workspace Name
+              </label>
+              <input
+                type="text"
+                value={appName}
+                onInput={(e) => setAppName(e.target.value)}
+                placeholder="e.g. My Sales CRM, Support Team..."
+                required
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', marginBottom: '32px' }}>
+              {/* Option 1: Local */}
+              <div 
+                onClick={() => handleSelectMode('local')}
+                style={{
+                  padding: '20px',
+                  borderRadius: '16px',
+                  border: `2px solid ${selectedMode === 'local' ? '#6366f1' : 'rgba(255,255,255,0.06)'}`,
+                  background: selectedMode === 'local' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedMode === 'local' ? '0 0 20px rgba(99, 102, 241, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '20px' }}>🔒</span>
+                  <span style={{ fontWeight: 700, fontSize: '16px' }}>Offline Local Storage</span>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
+                  Keep your data strictly on this device. Fast, zero-setup, and 100% private.
+                </p>
+              </div>
+
+              {/* Option 2: GSheet */}
+              <div 
+                onClick={() => handleSelectMode('gsheet')}
+                style={{
+                  padding: '20px',
+                  borderRadius: '16px',
+                  border: `2px solid ${selectedMode === 'gsheet' ? '#6366f1' : 'rgba(255,255,255,0.06)'}`,
+                  background: selectedMode === 'gsheet' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedMode === 'gsheet' ? '0 0 20px rgba(99, 102, 241, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '20px' }}>🔌</span>
+                  <span style={{ fontWeight: 700, fontSize: '16px' }}>Google Sheets Cloud Sync</span>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
+                  Connect to your own Google Sheet. Safely backup and synchronize data across multiple devices.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleContinue}
+              disabled={!selectedMode || loading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '12px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: selectedMode && !loading ? 'pointer' : 'not-allowed',
+                opacity: selectedMode && !loading ? 1 : 0.5,
+                transition: 'all 0.15s ease',
+                boxShadow: selectedMode && !loading ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
+              }}
+            >
+              {loading ? 'Setting up...' : 'Continue'}
+            </button>
+          </>
+        ) : (
+          <form onSubmit={handleConnect} style={{ width: '100%', textAlign: 'left' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.5px', textAlign: 'center' }}>
+              Connect Google Sheets
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 28px 0', lineHeight: '1.5', textAlign: 'center' }}>
+              Enter your Google Apps Script Web App URL below to sync your contacts.
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Google Web App URL
+              </label>
+              <input
+                type="url"
+                value={gsheetUrl}
+                onInput={(e) => setGsheetUrl(e.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                required
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+              />
+            </div>
+
+            {error && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#f87171',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                marginBottom: '24px',
+                lineHeight: '1.4'
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
+              <button
+                type="button"
+                onClick={() => setStep('select')}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Back
+              </button>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  flex: 2,
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {loading && (
+                  <span style={{
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#fff',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    animation: 'vcrm-spin 0.8s infinite linear'
+                  }} />
+                )}
+                {loading ? 'Connecting & Syncing...' : 'Connect & Sync'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+      
+      <style>{`
+        @keyframes vcrm-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

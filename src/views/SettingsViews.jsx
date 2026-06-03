@@ -193,12 +193,12 @@ function PresetTextsEditor({ settings, onUpdate }) {
 }
 
 /* ─── Main settings View (Master-Detail tabbed layout) ─── */
-export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualConfigBackup, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar }) {
+export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualConfigBackup, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar, onDisconnectAndReset }) {
   const [activeTab, setActiveTab] = useState('customization');
 
   const MENU_ITEMS = [
     { id: 'customization', label: '🎨 Customization', desc: 'CRM Statuses & Preset Texts' },
-    { id: 'integrations', label: '🔌 Data Sync', desc: 'Google Sheets Cloud Sync Integration' },
+    { id: 'integrations', label: '🔌 Storage & Sync', desc: 'Select storage mode & sync options' },
     { id: 'data', label: '💾 Data & Backup', desc: 'Cloud snapshots & bulk imports' },
     { id: 'system', label: '⚙ System Settings', desc: 'Delay pacing & layout options' }
   ];
@@ -294,55 +294,164 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
           {activeTab === 'integrations' && (
             <>
               <SettingsCard
-                title="GSheet CRM Sync"
-                desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script."
-                action={
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    background: settings.gsheetUrl ? '#dcfce7' : '#fee2e2',
-                    color: settings.gsheetUrl ? '#15803d' : '#b91c1c',
-                    border: `1px solid ${settings.gsheetUrl ? '#86efac' : '#fecaca'}`
-                  }}>
-                    {settings.gsheetUrl ? '● Connected' : '○ Unconfigured'}
-                  </span>
-                }
+                title="Data Storage Mode"
+                desc="Choose where your primary CRM database is saved and how it is synchronized."
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Apps Script Web App URL</label>
-                    <input type="text" placeholder="https://script.google.com/macros/s/.../exec" value={settings.gsheetUrl || ''} onInput={e => onUpdate('gsheetUrl', e.target.value)}
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>App / Workspace Name</label>
+                    <input type="text" placeholder="GV-CRM" value={settings.appName || ''} onInput={e => onUpdate('appName', e.target.value)}
                       style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #cbd5e1`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
                       onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
                       onBlur={e => { e.target.style.borderColor = "#cbd5e1"; e.target.style.boxShadow = 'none'; }} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync Individual Updates</div>
-                      <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Push contacts and lists to Google Sheets the moment they are saved.</div>
-                    </div>
-                    <button onClick={() => onUpdate('gsheetAuto', !settings.gsheetAuto)} style={{
-                      width: '46px', height: '24px', borderRadius: '12px', background: settings.gsheetAuto ? '#4f46e5' : '#e2e8f0',
-                      border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
-                    }}>
-                      <div style={{
-                        width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
-                        position: 'absolute', top: '3px', left: settings.gsheetAuto ? '25px' : '3px',
-                        transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
-                      }}></div>
-                    </button>
-                  </div>
-                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '4px' }}>
-                    <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '.3px' }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
-                      onMouseLeave={e => e.currentTarget.style.opacity = 1}
+
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    {/* Option 1: Local */}
+                    <div 
+                      onClick={() => onUpdate('syncMode', 'local')}
+                      style={{
+                        flex: 1,
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: `2px solid ${settings.syncMode === 'local' ? '#4f46e5' : '#e2e8f0'}`,
+                        background: settings.syncMode === 'local' ? '#f5f3ff' : '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
                     >
-                      🔄 Full Sync with Google Sheets
-                    </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '16px' }}>🔒</span>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: settings.syncMode === 'local' ? '#4f46e5' : '#1e293b' }}>Local Storage Only</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                        Save database strictly on this device. Privacy-first & offline.
+                      </div>
+                    </div>
+
+                    {/* Option 2: GSheet */}
+                    <div 
+                      onClick={() => onUpdate('syncMode', 'gsheet')}
+                      style={{
+                        flex: 1,
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: `2px solid ${settings.syncMode === 'gsheet' ? '#4f46e5' : '#e2e8f0'}`,
+                        background: settings.syncMode === 'gsheet' ? '#f5f3ff' : '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '16px' }}>🔌</span>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: settings.syncMode === 'gsheet' ? '#4f46e5' : '#1e293b' }}>Google Sheets Sync</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                        Sync with Google Sheets Web App. Cross-device and cloud backups.
+                      </div>
+                    </div>
                   </div>
+                </div>
+              </SettingsCard>
+
+              {settings.syncMode === 'gsheet' ? (
+                <SettingsCard
+                  title="GSheet CRM Sync"
+                  desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script."
+                  action={
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      background: settings.gsheetUrl ? '#dcfce7' : '#fee2e2',
+                      color: settings.gsheetUrl ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${settings.gsheetUrl ? '#86efac' : '#fecaca'}`
+                    }}>
+                      {settings.gsheetUrl ? '● Connected' : '○ Unconfigured'}
+                    </span>
+                  }
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Apps Script Web App URL</label>
+                      <input type="text" placeholder="https://script.google.com/macros/s/.../exec" value={settings.gsheetUrl || ''} onInput={e => onUpdate('gsheetUrl', e.target.value)}
+                        style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #cbd5e1`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
+                        onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
+                        onBlur={e => { e.target.style.borderColor = "#cbd5e1"; e.target.style.boxShadow = 'none'; }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '4px' }}>Auto-Sync Individual Updates</div>
+                        <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.5 }}>Push contacts and lists to Google Sheets the moment they are saved.</div>
+                      </div>
+                      <button onClick={() => onUpdate('gsheetAuto', !settings.gsheetAuto)} style={{
+                        width: '46px', height: '24px', borderRadius: '12px', background: settings.gsheetAuto ? '#4f46e5' : '#e2e8f0',
+                        border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
+                      }}>
+                        <div style={{
+                          width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: '3px', left: settings.gsheetAuto ? '25px' : '3px',
+                          transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                        }}></div>
+                      </button>
+                    </div>
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '4px' }}>
+                      <button onClick={onManualGSheetSync} style={{ width: '100%', padding: '14px 0', background: "#4f46e5", color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '.3px' }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+                        onMouseLeave={e => e.currentTarget.style.opacity = 1}
+                      >
+                        🔄 Full Sync with Google Sheets
+                      </button>
+                    </div>
+                  </div>
+                </SettingsCard>
+              ) : (
+                <div style={{
+                  padding: '28px 24px',
+                  borderRadius: '16px',
+                  border: '1.5px dashed #cbd5e1',
+                  background: '#f8fafc',
+                  textAlign: 'center',
+                  color: '#64748b'
+                }}>
+                  <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🔒</span>
+                  <div style={{ fontWeight: 700, color: '#475569', marginBottom: '4px', fontSize: '14px' }}>Offline Mode Active</div>
+                  <p style={{ fontSize: '12.5px', margin: 0, lineHeight: 1.5 }}>
+                    Your CRM data is currently stored offline inside your local browser database. Sync features are disabled. Switch to Google Sheets mode to sync data across devices.
+                  </p>
+                </div>
+              )}
+
+              <SettingsCard
+                title="⚠️ Danger Zone"
+                desc="Completely reset your CRM. This will delete all local contacts, campaigns, custom forms, and reset settings."
+              >
+                <div style={{ padding: '4px 0' }}>
+                  <button 
+                    onClick={onDisconnectAndReset}
+                    style={{
+                      padding: '12px 20px',
+                      background: '#fee2e2',
+                      color: '#ef4444',
+                      border: '1.5px solid #fca5a5',
+                      borderRadius: '10px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      width: '100%'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#fecaca';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#fee2e2';
+                    }}
+                  >
+                    🗑️ Disconnect & Reset CRM Database
+                  </button>
                 </div>
               </SettingsCard>
             </>
@@ -359,27 +468,47 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
               onGSheetRestore={onGSheetRestore}
               onManualConfigBackup={onManualConfigBackup}
               gsheetUrl={settings.gsheetUrl}
+              syncMode={settings.syncMode}
             />
           )}
 
           {activeTab === 'system' && (
             <>
               <SettingsCard title="Layout & UI" desc="Customize the Google Voice workspace appearance.">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '6px' }}>Hide GV Right Sidebar</div>
-                    <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.6 }}>Removes the default sidebar with dialpad and contacts for a wider workspace.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '6px' }}>Hide GV Right Sidebar</div>
+                      <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.6 }}>Removes the default sidebar with dialpad and contacts for a wider workspace.</div>
+                    </div>
+                    <button onClick={() => onUpdate('hideRightSidebar', !settings.hideRightSidebar)} style={{
+                      width: '52px', height: '28px', borderRadius: '14px', background: settings.hideRightSidebar ? '#4f46e5' : '#e2e8f0',
+                      border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
+                    }}>
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: '3px', left: settings.hideRightSidebar ? '27px' : '3px',
+                        transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                      }}></div>
+                    </button>
                   </div>
-                  <button onClick={() => onUpdate('hideRightSidebar', !settings.hideRightSidebar)} style={{
-                    width: '52px', height: '28px', borderRadius: '14px', background: settings.hideRightSidebar ? '#4f46e5' : '#e2e8f0',
-                    border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
-                  }}>
-                    <div style={{
-                      width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: '3px', left: settings.hideRightSidebar ? '27px' : '3px',
-                      transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                    }}></div>
-                  </button>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: "#1e293b", marginBottom: '6px' }}>Show Conversation Icon in Contacts</div>
+                      <div style={{ fontSize: '12.5px', color: "#64748b", lineHeight: 1.6 }}>Display the quick open-conversation bubble next to contact names (only hidden when in Standalone mode).</div>
+                    </div>
+                    <button onClick={() => onUpdate('showConversationIcon', settings.showConversationIcon !== false ? false : true)} style={{
+                      width: '52px', height: '28px', borderRadius: '14px', background: settings.showConversationIcon !== false ? '#4f46e5' : '#e2e8f0',
+                      border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0
+                    }}>
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: '3px', left: settings.showConversationIcon !== false ? '27px' : '3px',
+                        transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                      }}></div>
+                    </button>
+                  </div>
                 </div>
               </SettingsCard>
 
@@ -433,7 +562,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
 }
 
 /* ─── IOView Panel (Import, Export, cloud state backups) ─── */
-export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onManualConfigBackup, gsheetUrl }) {
+export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onManualConfigBackup, gsheetUrl, syncMode }) {
   const [scope, setScope] = useState('all');
   const [resMsg, setResMsg] = useState(null);
   const [rawText, setRawText] = useState('');
@@ -533,137 +662,141 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
 
   return (
     <>
-      <SettingsCard title="💾 State Backup" desc="Securely save your entire workspace state to Google Sheets or backup locally as a JSON file.">
-        {!gsheetUrl ? (
-          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
-            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud backup snapshots.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0 2px' }}>
+      <SettingsCard title="💾 State Backup" desc={syncMode === 'local' ? "Securely backup your database locally as a JSON file." : "Securely save your entire workspace state to Google Sheets or backup locally as a JSON file."}>
+        {syncMode === 'gsheet' && (
+          <>
+            {!gsheetUrl ? (
+              <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500, marginBottom: '16px' }}>
+                ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Storage & Sync tab to enable cloud backup snapshots.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0 2px' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                  <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Google Sheets Backup</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <button
+                    disabled={gsheetBackupLoading}
+                    onClick={() => {
+                      setGsheetBackupLoading(true);
+                      setGsheetBackupError('');
+                      setGsheetBackupId('');
+                      onGSheetBackup(
+                        (id) => {
+                          setGsheetBackupLoading(false);
+                          setGsheetBackupId(id);
+                        },
+                        (err) => {
+                          setGsheetBackupLoading(false);
+                          setGsheetBackupError(err);
+                        }
+                      );
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '14px 0',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: gsheetBackupLoading ? '#a7f3d0' : 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      cursor: gsheetBackupLoading ? 'default' : 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 4px rgba(16,185,129,0.1)'
+                    }}
+                  >
+                    {gsheetBackupLoading ? '☁ Saving Snapshot to Google Sheets...' : '☁ Backup Full State to Google Sheets'}
+                  </button>
+
+                  <button
+                    onClick={onManualConfigBackup}
+                    style={{
+                      width: '100%',
+                      padding: '14px 0',
+                      borderRadius: '10px',
+                      border: '1.5px solid #05966933',
+                      background: '#f0fdf4',
+                      color: '#059669',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px rgba(5,150,105,0.04)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#e6fbf0';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#f0fdf4';
+                    }}
+                  >
+                    ☁ Backup CRM Config (Settings, Campaigns, Forms)
+                  </button>
+
+                  {gsheetBackupError && (
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                      ❌ Backup Failed: {gsheetBackupError}
+                    </div>
+                  )}
+
+                  {gsheetBackupId && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '14px 16px',
+                      background: '#f0fdf4',
+                      borderRadius: '10px',
+                      border: '1.5px dashed #86efac',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>✅</span> GSheet Backup Successful!
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Snapshot ID:</span>
+                        <code style={{ fontSize: '12.5px', color: '#15803d', fontWeight: 700, fontFamily: '"DM Mono",monospace', flex: 1 }}>{gsheetBackupId}</code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(gsheetBackupId);
+                            setGsheetCopied(true);
+                            setTimeout(() => setGsheetCopied(false), 2000);
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            background: gsheetCopied ? '#15803d' : '#f0fdf4',
+                            color: gsheetCopied ? '#fff' : '#15803d',
+                            border: '1px solid #86efac',
+                            borderRadius: '5px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {gsheetCopied ? 'Copied! ✓' : 'Copy'}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#166534', opacity: 0.8, lineHeight: 1.4 }}>
+                        Write down or copy this ID. You can enter this ID below on any device to restore this exact workspace snapshot.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
               <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-              <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Google Sheets Backup</span>
+              <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Backup</span>
               <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button
-                disabled={gsheetBackupLoading}
-                onClick={() => {
-                  setGsheetBackupLoading(true);
-                  setGsheetBackupError('');
-                  setGsheetBackupId('');
-                  onGSheetBackup(
-                    (id) => {
-                      setGsheetBackupLoading(false);
-                      setGsheetBackupId(id);
-                    },
-                    (err) => {
-                      setGsheetBackupLoading(false);
-                      setGsheetBackupError(err);
-                    }
-                  );
-                }}
-                style={{
-                  width: '100%',
-                  padding: '14px 0',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: gsheetBackupLoading ? '#a7f3d0' : 'linear-gradient(135deg, #10b981, #059669)',
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  cursor: gsheetBackupLoading ? 'default' : 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 4px rgba(16,185,129,0.1)'
-                }}
-              >
-                {gsheetBackupLoading ? '☁ Saving Snapshot to Google Sheets...' : '☁ Backup Full State to Google Sheets'}
-              </button>
-
-              <button
-                onClick={onManualConfigBackup}
-                style={{
-                  width: '100%',
-                  padding: '14px 0',
-                  borderRadius: '10px',
-                  border: '1.5px solid #05966933',
-                  background: '#f0fdf4',
-                  color: '#059669',
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 2px rgba(5,150,105,0.04)'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = '#e6fbf0';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = '#f0fdf4';
-                }}
-              >
-                ☁ Backup CRM Config (Settings, Campaigns, Forms)
-              </button>
-
-              {gsheetBackupError && (
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
-                  ❌ Backup Failed: {gsheetBackupError}
-                </div>
-              )}
-
-              {gsheetBackupId && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '14px 16px',
-                  background: '#f0fdf4',
-                  borderRadius: '10px',
-                  border: '1.5px dashed #86efac',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <div style={{ fontSize: '13px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>✅</span> GSheet Backup Successful!
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Snapshot ID:</span>
-                    <code style={{ fontSize: '12.5px', color: '#15803d', fontWeight: 700, fontFamily: '"DM Mono",monospace', flex: 1 }}>{gsheetBackupId}</code>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(gsheetBackupId);
-                        setGsheetCopied(true);
-                        setTimeout(() => setGsheetCopied(false), 2000);
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        background: gsheetCopied ? '#15803d' : '#f0fdf4',
-                        color: gsheetCopied ? '#fff' : '#15803d',
-                        border: '1px solid #86efac',
-                        borderRadius: '5px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      {gsheetCopied ? 'Copied! ✓' : 'Copy'}
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#166534', opacity: 0.8, lineHeight: 1.4 }}>
-                    Write down or copy this ID. You can enter this ID below on any device to restore this exact workspace snapshot.
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          </>
         )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-          <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Backup</span>
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-        </div>
 
         <button
           onClick={onDownloadState}
@@ -673,78 +806,88 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
         </button>
       </SettingsCard>
 
-      <SettingsCard title="🔄 State Restore" desc="Restore your workspace state from a Google Sheets snapshot or a local JSON file.">
+      <SettingsCard title="🔄 State Restore" desc={syncMode === 'local' ? "Restore your workspace state from a local JSON file." : "Restore your workspace state from a Google Sheets snapshot or a local JSON file."}>
         <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e', lineHeight: 1.6, fontWeight: 500, marginBottom: '16px' }}>
           ⚠️ <strong>Warning: Loading or restoring a state backup will completely overwrite your current local data (contacts, lists, campaigns, forms, settings).</strong> Make sure to download or create a backup first.
         </div>
 
-        {!gsheetUrl ? (
-          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500 }}>
-            ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Data Sync tab to enable cloud snapshot restores.
-          </div>
-        ) : (
-          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px' }}>
-              Restore from Google Sheets Snapshot
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Paste Snapshot ID (e.g. APPSTATE-2026-05-31)"
-                value={inputSnapshotId}
-                onInput={e => setInputSnapshotId(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  fontFamily: '"DM Mono",monospace',
-                  background: '#fff',
-                  color: '#0f172a'
-                }}
-                onFocus={e => { e.target.style.borderColor = "#4f46e5"; }}
-                onBlur={e => { e.target.style.borderColor = "#cbd5e1"; }}
-              />
-              <button
-                disabled={gsheetRestoreLoading || !inputSnapshotId.trim()}
-                onClick={() => {
-                  setGsheetRestoreLoading(true);
-                  setGsheetRestoreError('');
-                  onGSheetRestore(
-                    inputSnapshotId,
-                    () => {
-                      setGsheetRestoreLoading(false);
-                      setInputSnapshotId('');
-                    },
-                    (err) => {
-                      setGsheetRestoreLoading(false);
-                      setGsheetRestoreError(err);
-                    }
-                  );
-                }}
-                style={{
-                  padding: '0 16px',
-                  background: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? '#cbd5e1' : '#4f46e5',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? 'default' : 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {gsheetRestoreLoading ? 'Restoring...' : 'Restore'}
-              </button>
-            </div>
-            {gsheetRestoreError && (
-              <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
-                ❌ Restore Failed: {gsheetRestoreError}
+        {syncMode === 'gsheet' && (
+          <>
+            {!gsheetUrl ? (
+              <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca', fontSize: '12.5px', color: '#b91c1c', lineHeight: 1.5, fontWeight: 500, marginBottom: '16px' }}>
+                ⚠️ <strong>Google Sheets Integration not configured.</strong> Please set a valid Apps Script URL under the Storage & Sync tab to enable cloud snapshot restores.
+              </div>
+            ) : (
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: "#475569", textTransform: 'uppercase', letterSpacing: '.8px' }}>
+                  Restore from Google Sheets Snapshot
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Paste Snapshot ID (e.g. APPSTATE-2026-05-31)"
+                    value={inputSnapshotId}
+                    onInput={e => setInputSnapshotId(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      fontFamily: '"DM Mono",monospace',
+                      background: '#fff',
+                      color: '#0f172a'
+                    }}
+                    onFocus={e => { e.target.style.borderColor = "#4f46e5"; }}
+                    onBlur={e => { e.target.style.borderColor = "#cbd5e1"; }}
+                  />
+                  <button
+                    disabled={gsheetRestoreLoading || !inputSnapshotId.trim()}
+                    onClick={() => {
+                      setGsheetRestoreLoading(true);
+                      setGsheetRestoreError('');
+                      onGSheetRestore(
+                        inputSnapshotId,
+                        () => {
+                          setGsheetRestoreLoading(false);
+                          setInputSnapshotId('');
+                        },
+                        (err) => {
+                          setGsheetRestoreLoading(false);
+                          setGsheetRestoreError(err);
+                        }
+                      );
+                    }}
+                    style={{
+                      padding: '0 16px',
+                      background: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? '#cbd5e1' : '#4f46e5',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: (!inputSnapshotId.trim() || gsheetRestoreLoading) ? 'default' : 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {gsheetRestoreLoading ? 'Restoring...' : 'Restore'}
+                  </button>
+                </div>
+                {gsheetRestoreError && (
+                  <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                    ❌ Restore Failed: {gsheetRestoreError}
+                  </div>
+                )}
               </div>
             )}
-          </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>
+              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+              <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Local Restore</span>
+              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            </div>
+          </>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0 10px' }}>

@@ -109,12 +109,26 @@ export function ListModal({ list, onSave, onClose }) {
   );
 }
 
-export function CampaignModal({ campaign, lists, settings, contacts, onSave, onDelete, onClose }) {
+export function CampaignModal({ campaign, lists, settings, contacts, forms = [], onSave, onDelete, onClose }) {
   const isNew = !campaign;
-  const [data, setData] = useState(() => campaign
-    ? JSON.parse(JSON.stringify(campaign))
-    : { id: uid(), name: '', listIds: [], message: '', imageDataUrl: '', delayMin: 20, delayMax: 60, status: 'draft', log: [], createdAt: Date.now() }
-  );
+  const [data, setData] = useState(() => {
+    const base = campaign ? JSON.parse(JSON.stringify(campaign)) : {};
+    return {
+      id: uid(),
+      name: '',
+      listIds: [],
+      type: 'sms',
+      formId: '',
+      message: '',
+      imageDataUrl: '',
+      delayMin: 20,
+      delayMax: 60,
+      status: 'draft',
+      log: [],
+      createdAt: Date.now(),
+      ...base
+    };
+  });
 
   // Normalize older campaign data if it was using string IDs
   const normalizedSelections = (data.listIds || []).map(entry => (typeof entry === 'string' ? { listId: entry, status: '' } : entry));
@@ -140,7 +154,11 @@ export function CampaignModal({ campaign, lists, settings, contacts, onSave, onD
     <>
       {!isNew && <Btn variant="danger" onClick={() => { if (confirm('Delete this campaign?')) onDelete(data.id); }}>Delete</Btn>}
       <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      <Btn variant="primary" onClick={() => { if (!data.name.trim()) { alert('Name required'); return; } onSave(data); }}>
+      <Btn variant="primary" onClick={() => {
+        if (!data.name.trim()) { alert('Name required'); return; }
+        if (data.type === 'form' && !data.formId) { alert('Please select a target form'); return; }
+        onSave(data);
+      }}>
         {isNew ? 'Create Campaign' : 'Save Changes'}
       </Btn>
     </>
@@ -150,61 +168,94 @@ export function CampaignModal({ campaign, lists, settings, contacts, onSave, onD
     <Modal title={isNew ? 'New Campaign' : 'Edit Campaign'} onClose={onClose} footer={footer}>
       <Field label="Campaign Name"><Input value={data.name} onInput={e => set('name', e.target.value)} placeholder="e.g. Summer Event Reminder" /></Field>
 
-      <Field label={<span style={{ display: 'flex', justifyContent: 'space-between' }}>Message <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{(data.message || '').length} chars</span></span>}>
-        <Textarea
-          id="campaign-message-textarea"
-          value={data.message}
-          onInput={e => set('message', e.target.value)}
-          placeholder="Type your SMS message here…"
-          style={{ minHeight: '100px' }}
-        />
-        <div style={{ paddingTop: '10px', paddingBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginRight: '2px' }}>Insert:</span>
-          {[
-            { token: '{{name}}', label: '👤 name' },
-            { token: '{{email}}', label: '✉️ email' },
-            { token: '{{phone}}', label: '📞 phone' },
-            { token: '{{handle}}', label: '🔖 handle' },
-          ].map(({ token, label }) => (
-            <button
-              key={token}
-              type="button"
-              onClick={() => {
-                const el = document.getElementById('campaign-message-textarea');
-                if (el) {
-                  const start = el.selectionStart ?? (data.message || '').length;
-                  const end = el.selectionEnd ?? start;
-                  const msg = data.message || '';
-                  set('message', msg.slice(0, start) + token + msg.slice(end));
-                  // restore cursor after Preact re-render
-                  setTimeout(() => { el.selectionStart = el.selectionEnd = start + token.length; el.focus(); }, 0);
-                } else {
-                  set('message', (data.message || '') + token);
-                }
-              }}
-              style={{
-                padding: '4px 11px', borderRadius: '99px', border: '1.5px solid #e0e7ff',
-                background: '#f5f3ff', color: '#4338ca', fontSize: '12px', fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-              }}
-            >{label}</button>
-          ))}
-          <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '4px', paddingTop: '10px' }}>Spaces allowed: <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>{'{{ name }}'}</code></span>
-        </div>
+      <Field label="Campaign Type">
+        <Select
+          value={data.type || 'sms'}
+          onChange={e => set('type', e.target.value)}
+          style={{ padding: '8px 12px', fontSize: '13px' }}
+        >
+          <option value="sms">💬 SMS / MMS Campaign (Requires Google Voice)</option>
+          <option value="form">📋 Form Campaign (POST to Endpoint)</option>
+        </Select>
       </Field>
 
+      {data.type === 'form' ? (
+        <Field label="Target Form">
+          {forms.length === 0 ? (
+            <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '13px', fontWeight: 600 }}>
+              No custom forms created yet. Go to the Forms tab to create one first.
+            </div>
+          ) : (
+            <Select
+              value={data.formId}
+              onChange={e => set('formId', e.target.value)}
+              style={{ padding: '8px 12px', fontSize: '13px' }}
+            >
+              <option value="">— Select a Custom Form —</option>
+              {forms.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      ) : (
+        <>
+          <Field label={<span style={{ display: 'flex', justifyContent: 'space-between' }}>Message <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{(data.message || '').length} chars</span></span>}>
+            <Textarea
+              id="campaign-message-textarea"
+              value={data.message}
+              onInput={e => set('message', e.target.value)}
+              placeholder="Type your SMS message here…"
+              style={{ minHeight: '100px' }}
+            />
+            <div style={{ paddingTop: '10px', paddingBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginRight: '2px' }}>Insert:</span>
+              {[
+                { token: '{{name}}', label: '👤 name' },
+                { token: '{{email}}', label: '✉️ email' },
+                { token: '{{phone}}', label: '📞 phone' },
+                { token: '{{handle}}', label: '🔖 handle' },
+              ].map(({ token, label }) => (
+                <button
+                  key={token}
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('campaign-message-textarea');
+                    if (el) {
+                      const start = el.selectionStart ?? (data.message || '').length;
+                      const end = el.selectionEnd ?? start;
+                      const msg = data.message || '';
+                      set('message', msg.slice(0, start) + token + msg.slice(end));
+                      // restore cursor after Preact re-render
+                      setTimeout(() => { el.selectionStart = el.selectionEnd = start + token.length; el.focus(); }, 0);
+                    } else {
+                      set('message', (data.message || '') + token);
+                    }
+                  }}
+                  style={{
+                    padding: '4px 11px', borderRadius: '99px', border: '1.5px solid #e0e7ff',
+                    background: '#f5f3ff', color: '#4338ca', fontSize: '12px', fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  }}
+                >{label}</button>
+              ))}
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '4px', paddingTop: '10px' }}>Spaces allowed: <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>{'{{ name }}'}</code></span>
+            </div>
+          </Field>
 
-      <Field label="Attach Image (MMS)">
-        {data.imageDataUrl && <div style={{ position: 'relative', marginBottom: '8px' }}>
-          <img src={data.imageDataUrl} style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: `1.5px solid #e2e8f0` }} />
-          <button onClick={() => set('imageDataUrl', '')} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(15,23,42,.7)', color: '#fff', border: 'none', borderRadius: '5px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer' }}>✕ Remove</button>
-        </div>}
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
-          const f = e.target.files[0]; if (!f) return;
-          const r = new FileReader(); r.onload = ev => set('imageDataUrl', ev.target.result); r.readAsDataURL(f);
-        }} />
-        <button onClick={() => fileRef.current.click()} style={{ display: 'block', width: '100%', padding: '9px', border: `1.5px dashed #e2e8f0`, borderRadius: '8px', background: "#f8fafc", color: "#64748b", fontSize: '12.5px', fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}>📎 Choose image…</button>
-      </Field>
+          <Field label="Attach Image (MMS)">
+            {data.imageDataUrl && <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <img src={data.imageDataUrl} style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: `1.5px solid #e2e8f0` }} />
+              <button onClick={() => set('imageDataUrl', '')} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(15,23,42,.7)', color: '#fff', border: 'none', borderRadius: '5px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer' }}>✕ Remove</button>
+            </div>}
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+              const f = e.target.files[0]; if (!f) return;
+              const r = new FileReader(); r.onload = ev => set('imageDataUrl', ev.target.result); r.readAsDataURL(f);
+            }} />
+            <button onClick={() => fileRef.current.click()} style={{ display: 'block', width: '100%', padding: '9px', border: `1.5px dashed #e2e8f0`, borderRadius: '8px', background: "#f8fafc", color: "#64748b", fontSize: '12.5px', fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}>📎 Choose image…</button>
+          </Field>
+        </>
+      )}
 
       <Field label="Target Contacts by List & Status">
         {!lists.length

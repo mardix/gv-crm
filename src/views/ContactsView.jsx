@@ -302,7 +302,7 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       </td>
       <td style={getTdStyle(false, false, 'name')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-          {c.phone && (
+          {c.phone && (window.location.host.includes('voice.google.com') || settings.showConversationIcon !== false) && (
             <button
               onClick={e => { e.stopPropagation(); onOpenMessage(c.phone); }}
               style={{

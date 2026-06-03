@@ -227,10 +227,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-async function runCampaign(tabId, { id, phones, message, imageData, delayMin, delayMax }) {
+async function runCampaign(tabId, { id, type, form, phones, message, imageData, delayMin, delayMax }) {
   if (sendingCampaignId) return { error: 'Another campaign is already running' };
   sendingCampaignId = id;
   stopRequested = false;
+
+  const isSms = !type || type === 'sms';
 
   const randomDelay = () => {
     const minMs = (delayMin || 20) * 1000;
@@ -238,10 +240,12 @@ async function runCampaign(tabId, { id, phones, message, imageData, delayMin, de
     return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
   };
 
-  try {
-    await cdpAttach(tabId);
-  } catch (e) {
-    console.warn("CDP Attach failed", e);
+  if (isSms && tabId) {
+    try {
+      await cdpAttach(tabId);
+    } catch (e) {
+      console.warn("CDP Attach failed", e);
+    }
   }
 
   for (let i = 0; i < phones.length; i++) {
@@ -249,28 +253,97 @@ async function runCampaign(tabId, { id, phones, message, imageData, delayMin, de
 
     const entry = phones[i];
     const phone = entry.phone;
-    let finalMessage = message;
-    if (finalMessage) {
-      const firstName = (entry.name || '').split(' ')[0] || entry.name || '';
-      // Replace {{ token }} — spaces around token name are ignored
-      finalMessage = finalMessage.replace(/{{\s*name\s*}}/gi, firstName);
-      finalMessage = finalMessage.replace(/{{\s*email\s*}}/gi, entry.email || '');
-      finalMessage = finalMessage.replace(/{{\s*phone\s*}}/gi, entry.phone || '');
-      finalMessage = finalMessage.replace(/{{\s*handle\s*}}/gi, entry.handle || '');
-    }
 
-    try {
-      broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'sending', current: entry, next: phones[i + 1] || null, sent: i, total: phones.length });
-      await executePayload(tabId, phone, finalMessage, imageData, true);
-      broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: true });
-    } catch (e) {
-      broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: false, error: e.message });
-      if (e.message === 'RATE_LIMITED') {
-        stopRequested = true;
-        broadcast(null, { type: 'campaignRateLimit', campaignId: id });
-        break;
+    if (isSms) {
+      let finalMessage = message;
+      if (finalMessage) {
+        const firstName = (entry.name || '').split(' ')[0] || entry.name || '';
+        // Replace {{ token }} — spaces around token name are ignored
+        finalMessage = finalMessage.replace(/{{\s*name\s*}}/gi, firstName);
+        finalMessage = finalMessage.replace(/{{\s*email\s*}}/gi, entry.email || '');
+        finalMessage = finalMessage.replace(/{{\s*phone\s*}}/gi, entry.phone || '');
+        finalMessage = finalMessage.replace(/{{\s*handle\s*}}/gi, entry.handle || '');
+      }
+
+      try {
+        broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'sending', current: entry, next: phones[i + 1] || null, sent: i, total: phones.length });
+        await executePayload(tabId, phone, finalMessage, imageData, true);
+        broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: true });
+      } catch (e) {
+        broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: false, error: e.message });
+        if (e.message === 'RATE_LIMITED') {
+          stopRequested = true;
+          broadcast(null, { type: 'campaignRateLimit', campaignId: id });
+          break;
+        }
+      }
+    } else {
+      // Form Campaign
+      try {
+        broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'sending', current: entry, next: phones[i + 1] || null, sent: i, total: phones.length });
+        
+        // Construct form submission payload
+        const payload = {
+          crm_contact_id: entry.id || '',
+          crm_contact_name: entry.name || '',
+          crm_contact_phone: entry.phone || '',
+          crm_contact_email: entry.email || '',
+          crm_contact_handle: entry.handle || '',
+          crm_contact_location: entry.location || '',
+          crm_contact_status: entry.status || '',
+          crm_contact_leadSource: entry.leadSource || '',
+          crm_contact_category: entry.category || '',
+          crm_contact_membershipLevel: entry.membershipLevel || ''
+        };
+        
+        // Autofill form fields
+        if (form && Array.isArray(form.fields)) {
+          form.fields.forEach(f => {
+            let val = f.value || '';
+            if (f.autofill && entry[f.autofill]) {
+              val = entry[f.autofill];
+            }
+            payload[f.name] = val;
+          });
+        }
+
+        const endpoint = form?.endpointUrl || '';
+        const contentType = form?.contentType || 'json';
+        const headers = { 'Content-Type': contentType === 'text' ? 'text/plain' : 'application/json' };
+
+        const fetchRes = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        if (!fetchRes.ok) {
+          throw new Error(`HTTP ${fetchRes.status}: ${fetchRes.statusText}`);
+        }
+
+        const text = await fetchRes.text();
+        let resultOk = true;
+        let errorMsg = '';
+        try {
+          const json = JSON.parse(text);
+          if (json.ok === false || json.success === false) {
+            resultOk = false;
+            errorMsg = json.error || json.message || 'API rejected submission';
+          }
+        } catch (e) {
+          // not JSON, keep ok as true
+        }
+
+        if (resultOk) {
+          broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: true });
+        } else {
+          throw new Error(errorMsg);
+        }
+      } catch (e) {
+        broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: false, error: e.message });
       }
     }
+
     if (i < phones.length - 1 && !stopRequested) {
       const remainingSeconds = Math.round(randomDelay() / 1000);
       for (let t = remainingSeconds; t > 0; t--) {
@@ -281,7 +354,11 @@ async function runCampaign(tabId, { id, phones, message, imageData, delayMin, de
     }
   }
 
-  await cdpDetach(tabId);
+  if (isSms && tabId) {
+    try {
+      await cdpDetach(tabId);
+    } catch (e) {}
+  }
   sendingCampaignId = null;
   broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'done' });
   broadcast(tabId, { type: 'campaignDone', campaignId: id });

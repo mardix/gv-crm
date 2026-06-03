@@ -1,1 +1,0 @@
-import"./modulepreload-polyfill-wMinxHhO.js";import{a as e,t}from"./jsxRuntime.module-B0e0SKti.js";import{n,t as r}from"./styles-BRNCqED7.js";var i=document.createElement(`style`);i.textContent=r,document.head.appendChild(i),e(t(n,{}),document.getElementById(`app`));
