@@ -174,6 +174,139 @@ export function App({ togBtn }) {
     await sendGSheetAction('deleteContactList', { listId: id });
   }
 
+  function parseSafeDate(dStr) {
+    if (!dStr) return new Date(0);
+    let s = String(dStr).trim();
+    if (/^\d+$/.test(s)) return new Date(parseInt(s));
+    
+    // Normalize timezone-less strings (e.g. from Sheets/Apps Script) to UTC to avoid local timezone interpretation offsets
+    if (s.includes('-') || s.includes('/')) {
+      if (!s.endsWith('Z') && !s.includes('+') && !/-\d{2}:\d{2}$/.test(s)) {
+        s = s.replace(' ', 'T');
+        if (!s.includes('T')) s += 'T00:00:00';
+        s += 'Z';
+      }
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  }
+
+  async function syncConfigurationSnapshots() {
+    if (!settings.gsheetUrl) return;
+
+    const localTime = localStorage.getItem('vcrm_config_modified_at') || new Date(0).toISOString();
+    console.log('Syncing configurations (Strategy A)... Local modified at:', localTime);
+
+    // 1. Fetch metadata for CONFIG snapshot
+    const snapshotsRes = await sendGSheetAction('readDataSnapshots', {}, 'GET');
+    if (!snapshotsRes.ok) throw new Error(snapshotsRes.error || 'Failed to read snapshots metadata');
+
+    const configMetadata = (snapshotsRes.snapshots || []).find(s => s.snapshotType === 'CONFIG' && s.snapshotName === 'CRM-CONFIG');
+
+    if (configMetadata) {
+      const sheetTime = configMetadata.modifiedAt || configMetadata.createdAt || new Date(0).toISOString();
+      console.log('Found sheet CONFIG snapshot. Modified at:', sheetTime);
+
+      const parsedSheet = parseSafeDate(sheetTime);
+      const parsedLocal = parseSafeDate(localTime);
+
+      if (parsedSheet.getTime() > parsedLocal.getTime()) {
+        console.log('Sheet configuration is newer. Downloading and merging...');
+        const detailRes = await sendGSheetAction('readDataSnapshot', { snapshotId: configMetadata.snapshotId }, 'GET');
+        if (detailRes.ok && detailRes.snapshot && detailRes.snapshot.data) {
+          const payload = detailRes.snapshot.data;
+          
+          // Merge Settings
+          if (payload.settings) {
+            setSettings(s => ({ ...s, ...payload.settings }));
+          }
+
+          // Merge Forms (Union by ID)
+          if (payload.forms && Array.isArray(payload.forms)) {
+            setForms(localForms => {
+              const merged = [...localForms];
+              payload.forms.forEach(sf => {
+                const idx = merged.findIndex(f => f.id === sf.id);
+                if (idx >= 0) {
+                  merged[idx] = sf;
+                } else {
+                  merged.push(sf);
+                }
+              });
+              return merged;
+            });
+          }
+
+          // Merge Campaigns (Union by ID, keeping duplicate with higher log length)
+          if (payload.campaigns && Array.isArray(payload.campaigns)) {
+            setCampaigns(localCamps => {
+              const merged = [...localCamps];
+              payload.campaigns.forEach(sc => {
+                const idx = merged.findIndex(c => c.id === sc.id);
+                if (idx >= 0) {
+                  const localLogLen = merged[idx].log?.length || 0;
+                  const sheetLogLen = sc.log?.length || 0;
+                  if (sheetLogLen >= localLogLen) {
+                    merged[idx] = sc;
+                  }
+                } else {
+                  merged.push(sc);
+                }
+              });
+              return merged;
+            });
+          }
+
+          localStorage.setItem('vcrm_config_modified_at', sheetTime);
+          return;
+        }
+      }
+    }
+
+    // Local configuration is newer or none exists on sheet -> upload
+    console.log('Local configurations are newer (or none on sheet). Uploading to cloud...');
+    const uploadRes = await sendGSheetAction('saveDataSnapshot', {
+      snapshotType: 'CONFIG',
+      snapshotName: 'CRM-CONFIG',
+      snapshotMode: 'replace',
+      data: { settings, campaigns, forms }
+    });
+
+    if (uploadRes && uploadRes.ok) {
+      const serverTime = uploadRes.modifiedAt || uploadRes.createdAt || new Date().toISOString();
+      localStorage.setItem('vcrm_config_modified_at', serverTime);
+    }
+  }
+
+  async function handleManualConfigBackup() {
+    if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
+    const ok = confirm('Upload your local settings, campaigns, and custom forms to Google Sheets as a configuration backup? This will overwrite the existing crm-config backup on the sheet.');
+    if (!ok) return;
+
+    setSyncing(true);
+    try {
+      console.log('Manually backing up configurations (Strategy A)...');
+      const uploadRes = await sendGSheetAction('saveDataSnapshot', {
+        snapshotType: 'CONFIG',
+        snapshotName: 'CRM-CONFIG',
+        snapshotMode: 'replace',
+        data: { settings, campaigns, forms }
+      });
+
+      if (uploadRes && uploadRes.ok) {
+        const serverTime = uploadRes.modifiedAt || uploadRes.createdAt || new Date().toISOString();
+        localStorage.setItem('vcrm_config_modified_at', serverTime);
+        alert('Configuration backup successful!');
+      } else {
+        throw new Error(uploadRes?.error || 'Failed to upload configuration snapshot');
+      }
+    } catch (e) {
+      alert('Configuration backup failed: ' + e.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleGSheetSync() {
     if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
     const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
@@ -253,7 +386,11 @@ export function App({ togBtn }) {
       if (pushRes.ok) {
         setLists(updatedLists);
         setContacts(updatedContacts);
-        alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.`);
+
+        console.log('Sync Phase 4: Synchronizing configurations (Strategy A)...');
+        await syncConfigurationSnapshots();
+
+        alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.\n- Synchronized Settings, Campaigns, and Forms.`);
       } else {
         throw new Error(pushRes.error || 'Push phase failed');
       }
@@ -271,7 +408,9 @@ export function App({ togBtn }) {
       setCampaigns(d.campaigns);
       setForms(d.forms || []);
       setSettings(d.settings);
-      setLoaded(true);
+      setTimeout(() => {
+        setLoaded(true);
+      }, 100);
     });
 
     const rootEl = document.getElementById('vcrm-root');
@@ -330,9 +469,12 @@ export function App({ togBtn }) {
 
   useEffect(() => {
     if (loaded) {
-      saveData(state);
+      const timer = setTimeout(() => {
+        saveData({ contacts, lists, campaigns, forms, settings });
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [contacts, lists, campaigns, forms, settings]);
+  }, [contacts, lists, campaigns, forms, settings, loaded]);
 
   function switchView(v) {
     setView(v); setSearch(''); setFilterStatus(''); setFilterListId(''); setFilterListStatus(''); setFilterTag('');
@@ -422,13 +564,24 @@ export function App({ togBtn }) {
         const cleanLog = (c.log || []).filter(l => l.ok);
         return { ...c, log: cleanLog, status: 'ready' };
       }));
+      localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
       // Auto-trigger start after state sync
       setTimeout(() => handleCampaignUpdate(id, 'start'), 50);
       return;
     }
 
-    if (action === 'pause') { setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'paused' } : c)); chrome.runtime.sendMessage({ action: 'stopCampaign', id }); return; }
-    if (action === 'cancel') { setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'cancelled' } : c)); chrome.runtime.sendMessage({ action: 'stopCampaign', id }); return; }
+    if (action === 'pause') { 
+      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'paused' } : c)); 
+      localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
+      chrome.runtime.sendMessage({ action: 'stopCampaign', id }); 
+      return; 
+    }
+    if (action === 'cancel') { 
+      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'cancelled' } : c)); 
+      localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
+      chrome.runtime.sendMessage({ action: 'stopCampaign', id }); 
+      return; 
+    }
 
     if (action === 'start' || action === 'resume') {
       if (activeCampaignStatus) {
@@ -439,6 +592,7 @@ export function App({ togBtn }) {
       const remaining = phones.filter(p => !(camp.log || []).some(l => l.phone === p.phone));
       if (remaining.length === 0) {
         setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'done', completedAt: Date.now() } : c));
+        localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
         return;
       }
       setCampaigns(cs => cs.map(c => c.id === id ? {
@@ -450,6 +604,7 @@ export function App({ togBtn }) {
         // Snapshot full recipient roster once; never overwrite on resume
         recipients: c.recipients ?? phones.map(p => ({ phone: p.phone, name: p.name || '' })),
       } : c));
+      localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
 
       chrome.runtime.sendMessage({
         action: 'startCampaign',
@@ -480,6 +635,7 @@ export function App({ togBtn }) {
       log: []
     };
     setCampaigns(cs => [fresh, ...cs]);
+    localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
     setView('campaigns');
   }
 
@@ -1057,7 +1213,7 @@ export function App({ togBtn }) {
           }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
           {view === 'campaigns' && (
             <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
-              <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) setCampaigns(cs => cs.filter(c => c.id !== id)); }} onDuplicate={handleDuplicateCampaign} />
+              <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }} onDuplicate={handleDuplicateCampaign} />
             </div>
           )}
           {view === 'forms' && (
@@ -1065,12 +1221,12 @@ export function App({ togBtn }) {
               forms={forms}
               editingForm={formModal}
               onEdit={f => setFormModal(f)}
-              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); } }}
-              onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); setFormModal(null); }}
+              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }}
+              onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setFormModal(null); }}
               onClose={() => setFormModal(null)}
             />
           )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => setSettings(s => ({ ...s, [k]: v }))} onManualGSheetSync={handleGSheetSync} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
+          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => { setSettings(s => ({ ...s, [k]: v })); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); }} onManualGSheetSync={handleGSheetSync} onManualConfigBackup={handleManualConfigBackup} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} />}
         </div>
       </div>
 
@@ -1104,8 +1260,8 @@ export function App({ togBtn }) {
       {campaignModal && <CampaignModal
         campaign={campaignModal === 'new' ? null : campaignModal}
         lists={lists} contacts={contacts} settings={settings}
-        onSave={c => { setCampaigns(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); setCampaignModal(null); }}
-        onDelete={id => { setCampaigns(cs => cs.filter(c => c.id !== id)); setCampaignModal(null); }}
+        onSave={c => { setCampaigns(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; }); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setCampaignModal(null); }}
+        onDelete={id => { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setCampaignModal(null); }}
         onClose={() => setCampaignModal(null)}
       />}
 

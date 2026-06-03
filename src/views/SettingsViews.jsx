@@ -193,7 +193,7 @@ function PresetTextsEditor({ settings, onUpdate }) {
 }
 
 /* ─── Main settings View (Master-Detail tabbed layout) ─── */
-export function SettingsView({ settings, onUpdate, onManualGSheetSync, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar }) {
+export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualConfigBackup, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar }) {
   const [activeTab, setActiveTab] = useState('customization');
 
   const MENU_ITEMS = [
@@ -357,6 +357,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, contacts,
               onLoadState={onLoadState}
               onGSheetBackup={onGSheetBackup}
               onGSheetRestore={onGSheetRestore}
+              onManualConfigBackup={onManualConfigBackup}
               gsheetUrl={settings.gsheetUrl}
             />
           )}
@@ -432,7 +433,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, contacts,
 }
 
 /* ─── IOView Panel (Import, Export, cloud state backups) ─── */
-export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, gsheetUrl }) {
+export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onManualConfigBackup, gsheetUrl }) {
   const [scope, setScope] = useState('all');
   const [resMsg, setResMsg] = useState(null);
   const [rawText, setRawText] = useState('');
@@ -545,7 +546,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
               <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
             </div>
 
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button
                 disabled={gsheetBackupLoading}
                 onClick={() => {
@@ -577,7 +578,32 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
                   boxShadow: '0 2px 4px rgba(16,185,129,0.1)'
                 }}
               >
-                {gsheetBackupLoading ? '☁ Saving Snapshot to Google Sheets...' : '☁ Backup State to Google Sheets'}
+                {gsheetBackupLoading ? '☁ Saving Snapshot to Google Sheets...' : '☁ Backup Full State to Google Sheets'}
+              </button>
+
+              <button
+                onClick={onManualConfigBackup}
+                style={{
+                  width: '100%',
+                  padding: '14px 0',
+                  borderRadius: '10px',
+                  border: '1.5px solid #05966933',
+                  background: '#f0fdf4',
+                  color: '#059669',
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px rgba(5,150,105,0.04)'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#e6fbf0';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#f0fdf4';
+                }}
+              >
+                ☁ Backup CRM Config (Settings, Campaigns, Forms)
               </button>
 
               {gsheetBackupError && (

@@ -94,6 +94,7 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
         position: 'sticky',
         left: leftOffset,
         zIndex: 12,
+        boxShadow: '0 6px 0 0 #f8fafc, 0 -6px 0 0 #f8fafc',
         ...(key === 'phone' ? { borderRight: '2px solid #cbd5e1' } : {})
       } : {})
     };
@@ -271,6 +272,7 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
         position: 'sticky',
         left: leftOffset,
         zIndex: 2,
+        boxShadow: '0 6px 0 0 #f8fafc, 0 -6px 0 0 #f8fafc',
         ...(colKey === 'phone' ? { borderRight: '2px solid #cbd5e1' } : {})
       } : {})
     };

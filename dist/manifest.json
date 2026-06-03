@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.jsx-loader-CtEyNC5H.js"
+        "assets/main.jsx-loader-YlnjZgAe.js"
       ],
       "matches": [
         "https://voice.google.com/*"
@@ -30,7 +30,12 @@
   },
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "GV-CRM"
+    "default_title": "GV-CRM",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "icons": {
     "16": "icons/icon16.png",
@@ -45,7 +50,7 @@
       "resources": [
         "icons/*",
         "assets/jsxRuntime.module-DYcKo6ph.js",
-        "assets/main.jsx-DiUcpbqj.js"
+        "assets/main.jsx-Dzb1s_1L.js"
       ],
       "use_dynamic_url": false
     }
