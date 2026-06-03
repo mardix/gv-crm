@@ -4,13 +4,17 @@ import { Field } from './LayoutComponents';
 import { Btn } from './Btn';
 import { Input, Textarea, Select } from './FormComponents';
 import { uid, avatarColor, ini } from '../utils/utils';
+import { FormRunner } from './FormRunner';
 
-export function ContactModal({ contact, lists, settings, onSave, onDelete, onClose }) {
+export function ContactModal({ contact, lists, settings, forms, onSave, onDelete, onClose }) {
   const isNew = !contact;
   const [data, setData] = useState(() => contact
     ? JSON.parse(JSON.stringify(contact))
     : { id: uid(), name: '', phone: '', email: '', handle: '', location: '', tags: [], status: '', leadSource: '', category: '', membershipLevel: '', comment: '', lists: [], dnd: false }
   );
+
+  const [selectedFormId, setSelectedFormId] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
 
@@ -328,6 +332,62 @@ export function ContactModal({ contact, lists, settings, onSave, onDelete, onClo
         {/* LISTS & NOTES SECTION */}
         <Field label="List Assignments"><AssignBox /></Field>
         <Field label="Notes"><Textarea value={data.comment} onInput={e => set('comment', e.target.value)} placeholder="Any notes about this contact…" /></Field>
+
+        {/* EXECUTE FORMS SECTION */}
+        {!isNew && forms && forms.length > 0 && (() => {
+          const selectedForm = forms.find(f => f.id === selectedFormId);
+          return (
+            <>
+              <div style={{ height: '1.5px', background: 'linear-gradient(90deg, #e2e8f0 0%, rgba(226, 232, 240, 0) 100%)', margin: '6px 0' }} />
+              <Field label="Execute Form">
+                <div style={{ border: `1.5px solid #e2e8f0`, borderRadius: '10px', padding: '16px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <Select
+                      value={selectedFormId}
+                      onChange={e => { setSelectedFormId(e.target.value); setFormOpen(false); }}
+                      style={{ flex: 1, padding: '8px 10px', fontSize: '13px' }}
+                    >
+                      <option value="">— Select Form to Run —</option>
+                      {forms.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </Select>
+                    {selectedFormId && !formOpen && (
+                      <Btn
+                        variant="primary"
+                        onClick={() => setFormOpen(true)}
+                        style={{ padding: '8px 16px', height: '38px', fontSize: '12.5px', fontWeight: 700 }}
+                      >
+                        Open Form
+                      </Btn>
+                    )}
+                    {selectedFormId && formOpen && (
+                      <Btn
+                        variant="ghost"
+                        onClick={() => setFormOpen(false)}
+                        style={{ padding: '8px 16px', height: '38px', fontSize: '12.5px', fontWeight: 700 }}
+                      >
+                        Close Form
+                      </Btn>
+                    )}
+                  </div>
+
+                  {formOpen && selectedForm && (
+                    <div style={{ marginTop: '10px', padding: '16px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff' }}>
+                      <FormRunner
+                        form={selectedForm}
+                        contact={data}
+                        isInline={true}
+                        onDone={() => {
+                          setFormOpen(false);
+                          setSelectedFormId('');
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </Field>
+            </>
+          );
+        })()}
       </div>
     </Modal>
   );

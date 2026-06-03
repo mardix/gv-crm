@@ -308,33 +308,33 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
               style={{
                 width: '28px',
                 height: '28px',
-                border: '1px solid #e2e8f0',
+                border: '1px solid #bbf7d0',
                 cursor: 'pointer',
                 flexShrink: 0,
-                background: '#ffffff',
-                color: '#64748b',
-                borderRadius: '6px',
+                background: '#f0fdf4',
+                color: '#10b981',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 1px 2px rgba(16, 185, 129, 0.05)',
                 padding: 0
               }}
               title="Open Conversation"
               onMouseEnter={e => {
-                e.currentTarget.style.background = '#f5f3ff';
-                e.currentTarget.style.borderColor = '#c7d2fe';
-                e.currentTarget.style.color = '#4f46e5';
-                e.currentTarget.style.transform = 'translateY(-1px) scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(79,70,229,0.1)';
+                e.currentTarget.style.background = '#10b981';
+                e.currentTarget.style.borderColor = '#10b981';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.transform = 'translateY(-1.5px) scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.35)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = '#ffffff';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.color = '#64748b';
+                e.currentTarget.style.background = '#f0fdf4';
+                e.currentTarget.style.borderColor = '#bbf7d0';
+                e.currentTarget.style.color = '#10b981';
                 e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = '0 1px 2px rgba(15,23,42,0.04)';
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(16, 185, 129, 0.05)';
               }}
             >
               <div style={{

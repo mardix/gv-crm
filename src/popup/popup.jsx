@@ -23,6 +23,11 @@ export function Popup() {
     });
   }, []);
 
+  const handleOpenStandalone = () => {
+    chrome.runtime.openOptionsPage();
+    window.close();
+  };
+
   const handleOpen = () => {
     chrome.tabs.query({ url: 'https://voice.google.com/*' }, (tabs) => {
       if (tabs.length > 0) {
@@ -82,6 +87,7 @@ export function Popup() {
       </div>
 
       <div class="btn-group">
+        <button class="open-btn" style={{ background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#fff', border: 'none', marginBottom: '4px' }} onClick={handleOpenStandalone}>Launch Standalone CRM ↗</button>
         {!isGVPage && <button class="open-btn" onClick={handleOpen}>Open Google Voice →</button>}
         {!disabled && (
           <>

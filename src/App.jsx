@@ -12,8 +12,9 @@ import { useDraftStash } from './hooks/useDraftStash';
 import { ContextWidget } from './components/ContextWidget';
 import { PresetsWidget } from './components/PresetsWidget';
 export function App({ togBtn }) {
+  const isStandalone = window.location.protocol === 'chrome-extension:' || !window.location.host.includes('voice.google.com');
   const [loaded, setLoaded] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(isStandalone);
   const [view, setView] = useState('contacts');
   const [contacts, setContacts] = useState([]);
   const [lists, setLists] = useState([]);
@@ -797,8 +798,10 @@ export function App({ togBtn }) {
       if (res && res.error) console.error('GV-CRM Open Chat Error:', res.error);
     });
 
-    setOpen(false);
-    if (togBtn) togBtn.style.setProperty('display', 'flex', 'important');
+    if (!isStandalone) {
+      setOpen(false);
+      if (togBtn) togBtn.style.setProperty('display', 'flex', 'important');
+    }
   }
 
   useEffect(() => {
@@ -830,14 +833,14 @@ export function App({ togBtn }) {
   return (
     <div>
       <div id="vcrm-panel" style={{
-        position: 'fixed', top: 0, right: 0, width: '920px', height: '100vh',
-        background: '#f8fafc', borderLeft: `1px solid #e2e8f0`,
+        position: isStandalone ? 'relative' : 'fixed', top: 0, right: 0, width: isStandalone ? '100%' : '920px', height: '100vh',
+        background: '#f8fafc', borderLeft: isStandalone ? 'none' : `1px solid #e2e8f0`,
         zIndex: 2147483645, display: 'flex', flexDirection: 'column',
         fontFamily: 'Inter,system-ui,sans-serif', fontSize: '13px', color: '#0f172a',
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
+        transform: isStandalone ? 'none' : (open ? 'translateX(0)' : 'translateX(100%)'),
+        transition: isStandalone ? 'none' : 'transform .28s cubic-bezier(.4,0,.2,1)',
         overflow: 'hidden',
-        pointerEvents: open ? 'auto' : 'none',
+        pointerEvents: 'auto',
       }}>
 
         {/* ── Premium Dark Glassmorphic Topbar Header ── */}
@@ -1013,38 +1016,40 @@ export function App({ togBtn }) {
             )}
 
             {/* Exit/Close trigger */}
-            <button
-              onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } }}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                background: 'rgba(255, 255, 255, 0.05)',
-                color: 'rgba(255, 255, 255, 0.7)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'all 0.15s ease',
-                marginLeft: '4px'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#ef4444';
-                e.currentTarget.style.color = '#ffffff';
-                e.currentTarget.style.background = '#ef4444';
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
-            </button>
+            {!isStandalone && (
+              <button
+                onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } }}
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                  marginLeft: '4px'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = '#ef4444';
+                  e.currentTarget.style.color = '#ffffff';
+                  e.currentTarget.style.background = '#ef4444';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1233,7 +1238,7 @@ export function App({ togBtn }) {
       {/* ── Modals ── */}
       {contactModal && <ContactModal
         contact={contactModal === 'new' ? null : contactModal}
-        lists={lists} settings={settings}
+        lists={lists} settings={settings} forms={forms}
         onSave={c => {
           c.phone = formatPhone(c.phone);
           setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; });

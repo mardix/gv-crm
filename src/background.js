@@ -124,15 +124,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return { success: true };
     };
 
-    const tabId = sender.tab ? sender.tab.id : msg.tabId;
-    if (!tabId) {
-       chrome.tabs.query({active: true, currentWindow: true}, tabs => {
-           if(tabs.length) executeOpenChat(tabs[0].id).then(sendResponse).catch(e => sendResponse({error: e.message}));
-       });
-       return true;
+    const isGVTab = sender.tab && sender.tab.url && sender.tab.url.includes('voice.google.com');
+
+    if (isGVTab && sender.tab && sender.tab.id) {
+      executeOpenChat(sender.tab.id).then(sendResponse).catch(e => sendResponse({error: e.message}));
+    } else {
+      const handleStandaloneOpen = async () => {
+        const cleanNum = msg.number.startsWith('1') ? msg.number : '1' + msg.number;
+        const targetUrl = `https://voice.google.com/u/0/messages?itemId=t.%2B${cleanNum}`;
+
+        const tabs = await new Promise(resolve => {
+          chrome.tabs.query({ url: '*://voice.google.com/*' }, resolve);
+        });
+
+        if (tabs && tabs.length > 0) {
+          const gvTab = tabs[0];
+          await new Promise(resolve => {
+            chrome.tabs.update(gvTab.id, { active: true }, () => {
+              chrome.windows.update(gvTab.windowId, { focused: true }, resolve);
+            });
+          });
+          return executeOpenChat(gvTab.id);
+        } else {
+          await new Promise(resolve => {
+            chrome.tabs.create({ url: targetUrl, active: true }, resolve);
+          });
+          return { success: true };
+        }
+      };
+
+      handleStandaloneOpen().then(sendResponse).catch(e => sendResponse({error: e.message}));
     }
-    
-    executeOpenChat(tabId).then(sendResponse).catch(e => sendResponse({error: e.message}));
     return true;
   }
   

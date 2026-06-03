@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.jsx-loader-YlnjZgAe.js"
+        "assets/main.jsx-loader-B77vc7DE.js"
       ],
       "matches": [
         "https://voice.google.com/*"
@@ -42,6 +42,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "options_page": "src/options/index.html",
   "web_accessible_resources": [
     {
       "matches": [
@@ -49,8 +50,9 @@
       ],
       "resources": [
         "icons/*",
-        "assets/jsxRuntime.module-DYcKo6ph.js",
-        "assets/main.jsx-Dzb1s_1L.js"
+        "assets/jsxRuntime.module-B0e0SKti.js",
+        "assets/styles-BRNCqED7.js",
+        "assets/main.jsx-zdZ6KzXo.js"
       ],
       "use_dynamic_url": false
     }
