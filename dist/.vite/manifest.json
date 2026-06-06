@@ -9,46 +9,46 @@
     "file": "assets/jsxRuntime.module-B0e0SKti.js",
     "name": "jsxRuntime.module"
   },
-  "_main.jsx-loader-P39rqAFr.js": {
-    "file": "assets/main.jsx-loader-P39rqAFr.js",
-    "src": "_main.jsx-loader-P39rqAFr.js"
+  "_main.jsx-loader-DlJ6UZUH.js": {
+    "file": "assets/main.jsx-loader-DlJ6UZUH.js",
+    "src": "_main.jsx-loader-DlJ6UZUH.js"
   },
   "_modulepreload-polyfill-wMinxHhO.js": {
     "file": "assets/modulepreload-polyfill-wMinxHhO.js",
     "name": "modulepreload-polyfill"
   },
-  "_styles-Bcw1jhb_.js": {
-    "file": "assets/styles-Bcw1jhb_.js",
+  "_styles-DSdOQwPP.js": {
+    "file": "assets/styles-DSdOQwPP.js",
     "name": "styles",
     "imports": [
       "_jsxRuntime.module-B0e0SKti.js"
     ]
   },
   "src/background.js": {
-    "file": "assets/background.js-wyxdsKLz.js",
+    "file": "assets/background.js-C6qVdI_-.js",
     "name": "background.js",
     "src": "src/background.js",
     "isEntry": true
   },
   "src/main.jsx": {
-    "file": "assets/main.jsx-DxSUhU6k.js",
+    "file": "assets/main.jsx-B7pbYI-j.js",
     "name": "main.jsx",
     "src": "src/main.jsx",
     "isEntry": true,
     "imports": [
       "_jsxRuntime.module-B0e0SKti.js",
-      "_styles-Bcw1jhb_.js"
+      "_styles-DSdOQwPP.js"
     ]
   },
   "src/options/index.html": {
-    "file": "assets/options-CqE9PigQ.js",
+    "file": "assets/options-B75dNJrH.js",
     "name": "options",
     "src": "src/options/index.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-wMinxHhO.js",
       "_jsxRuntime.module-B0e0SKti.js",
-      "_styles-Bcw1jhb_.js"
+      "_styles-DSdOQwPP.js"
     ]
   },
   "src/popup/index.html": {

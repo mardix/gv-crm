@@ -109,6 +109,36 @@ export function ListModal({ list, onSave, onClose }) {
   );
 }
 
+function renderMessageWithHighlightedTokens(message) {
+  if (!message) return null;
+  const parts = message.split(/(\{\{[^}]+\}\})/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('{{') && part.endsWith('}}')) {
+      return (
+        <span
+          key={index}
+          style={{
+            background: '#eef2ff',
+            color: '#4338ca',
+            border: '1.5px solid #c7d2fe',
+            padding: '2px 6px',
+            borderRadius: '6px',
+            fontSize: '11.5px',
+            fontWeight: 700,
+            fontFamily: 'Inter, sans-serif',
+            display: 'inline-block',
+            margin: '0 2px',
+            verticalAlign: 'middle'
+          }}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 export function CampaignModal({ campaign, lists, settings, contacts, forms = [], onSave, onDelete, onClose }) {
   const isNew = !campaign;
   const [data, setData] = useState(() => {
@@ -166,20 +196,24 @@ export function CampaignModal({ campaign, lists, settings, contacts, forms = [],
 
   return (
     <Modal title={isNew ? 'New Campaign' : 'Edit Campaign'} onClose={onClose} footer={footer}>
-      <Field label="Campaign Name"><Input value={data.name} onInput={e => set('name', e.target.value)} placeholder="e.g. Summer Event Reminder" /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '4px' }}>
+        <Field label="Campaign Name">
+          <Input value={data.name} onInput={e => set('name', e.target.value)} placeholder="e.g. Summer Reminder" />
+        </Field>
 
-      <Field label="Campaign Type">
-        <Select
-          value={data.type || 'sms'}
-          onChange={e => set('type', e.target.value)}
-          style={{ padding: '8px 12px', fontSize: '13px' }}
-        >
-          <option value="sms">💬 SMS / MMS Campaign (Requires Google Voice)</option>
-          <option value="form">📋 Form Campaign (POST to Endpoint)</option>
-        </Select>
-      </Field>
+        <Field label="Campaign Type">
+          <Select
+            value={data.type || 'sms'}
+            onChange={e => set('type', e.target.value)}
+            style={{ padding: '11px 36px 11px 14px' }}
+          >
+            <option value="sms">💬 SMS / MMS Broadcast</option>
+            <option value="form">📋 Form Synchronization</option>
+          </Select>
+        </Field>
+      </div>
 
-      {data.type === 'form' ? (
+      {data.type === 'form' && (
         <Field label="Target Form">
           {forms.length === 0 ? (
             <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '13px', fontWeight: 600 }}>
@@ -189,7 +223,7 @@ export function CampaignModal({ campaign, lists, settings, contacts, forms = [],
             <Select
               value={data.formId}
               onChange={e => set('formId', e.target.value)}
-              style={{ padding: '8px 12px', fontSize: '13px' }}
+              style={{ padding: '11px 36px 11px 14px' }}
             >
               <option value="">— Select a Custom Form —</option>
               {forms.map(f => (
@@ -198,64 +232,77 @@ export function CampaignModal({ campaign, lists, settings, contacts, forms = [],
             </Select>
           )}
         </Field>
-      ) : (
-        <>
-          <Field label={<span style={{ display: 'flex', justifyContent: 'space-between' }}>Message <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{(data.message || '').length} chars</span></span>}>
-            <Textarea
-              id="campaign-message-textarea"
-              value={data.message}
-              onInput={e => set('message', e.target.value)}
-              placeholder="Type your SMS message here…"
-              style={{ minHeight: '100px' }}
-            />
-            <div style={{ paddingTop: '10px', paddingBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginRight: '2px' }}>Insert:</span>
-              {[
-                { token: '{{name}}', label: '👤 name' },
-                { token: '{{email}}', label: '✉️ email' },
-                { token: '{{phone}}', label: '📞 phone' },
-                { token: '{{handle}}', label: '🔖 handle' },
-              ].map(({ token, label }) => (
-                <button
-                  key={token}
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById('campaign-message-textarea');
-                    if (el) {
-                      const start = el.selectionStart ?? (data.message || '').length;
-                      const end = el.selectionEnd ?? start;
-                      const msg = data.message || '';
-                      set('message', msg.slice(0, start) + token + msg.slice(end));
-                      // restore cursor after Preact re-render
-                      setTimeout(() => { el.selectionStart = el.selectionEnd = start + token.length; el.focus(); }, 0);
-                    } else {
-                      set('message', (data.message || '') + token);
-                    }
-                  }}
-                  style={{
-                    padding: '4px 11px', borderRadius: '99px', border: '1.5px solid #e0e7ff',
-                    background: '#f5f3ff', color: '#4338ca', fontSize: '12px', fontWeight: 700,
-                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-                  }}
-                >{label}</button>
-              ))}
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '4px', paddingTop: '10px' }}>Spaces allowed: <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>{'{{ name }}'}</code></span>
-            </div>
-          </Field>
-
-          <Field label="Attach Image (MMS)">
-            {data.imageDataUrl && <div style={{ position: 'relative', marginBottom: '8px' }}>
-              <img src={data.imageDataUrl} style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: `1.5px solid #e2e8f0` }} />
-              <button onClick={() => set('imageDataUrl', '')} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(15,23,42,.7)', color: '#fff', border: 'none', borderRadius: '5px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer' }}>✕ Remove</button>
-            </div>}
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
-              const f = e.target.files[0]; if (!f) return;
-              const r = new FileReader(); r.onload = ev => set('imageDataUrl', ev.target.result); r.readAsDataURL(f);
-            }} />
-            <button onClick={() => fileRef.current.click()} style={{ display: 'block', width: '100%', padding: '9px', border: `1.5px dashed #e2e8f0`, borderRadius: '8px', background: "#f8fafc", color: "#64748b", fontSize: '12.5px', fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}>📎 Choose image…</button>
-          </Field>
-        </>
       )}
+
+      <Field label={<span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>Message Template</span> <span style={{ fontWeight: 700, fontSize: '11px', color: '#4f46e5', background: '#eef2ff', padding: '1px 6px', borderRadius: '4px' }}>{(data.message || '').length} chars</span></span>}>
+        <Textarea
+          id="campaign-message-textarea"
+          value={data.message}
+          onInput={e => set('message', e.target.value)}
+          placeholder={data.type === 'form' ? 'Type the message payload to submit...' : 'Type your SMS message here...'}
+          style={{ minHeight: '100px' }}
+        />
+        <div style={{ paddingTop: '10px', paddingBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+          <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginRight: '2px' }}>Insert:</span>
+          {[
+            { token: '{{name}}', label: '👤 name' },
+            { token: '{{email}}', label: '✉️ email' },
+            { token: '{{phone}}', label: '📞 phone' },
+            { token: '{{handle}}', label: '🔖 handle' },
+            { token: '{{contactId}}', label: 'ID contactId' },
+            { token: '{{status}}', label: 'Status' },
+            { token: '{{leadSource}}', label: 'Lead source' },
+            { token: '{{category}}', label: 'Category' },
+            { token: '{{membershipLevel}}', label: 'Membership' },
+          ].map(({ token, label }) => (
+            <button
+              key={token}
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('campaign-message-textarea');
+                if (el) {
+                  const start = el.selectionStart ?? (data.message || '').length;
+                  const end = el.selectionEnd ?? start;
+                  const msg = data.message || '';
+                  set('message', msg.slice(0, start) + token + msg.slice(end));
+                  setTimeout(() => { el.selectionStart = el.selectionEnd = start + token.length; el.focus(); }, 0);
+                } else {
+                  set('message', (data.message || '') + token);
+                }
+              }}
+              style={{
+                padding: '4px 11px', borderRadius: '99px', border: '1.5px solid #cbd5e1',
+                background: '#ffffff', color: '#475569', fontSize: '11.5px', fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.background = '#f5f3ff'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = '#ffffff'; }}
+            >{label}</button>
+          ))}
+        </div>
+
+        {/* Real-time highlighted message template preview */}
+        {data.message && (
+          <div style={{ marginTop: '4px', padding: '12px 14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px' }}>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Live Template Preview</div>
+            <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, wordBreak: 'break-word' }}>
+              {renderMessageWithHighlightedTokens(data.message)}
+            </div>
+          </div>
+        )}
+      </Field>
+
+      <Field label={data.type === 'form' ? 'Payload Attachment' : 'Attach Image (MMS)'}>
+        {data.imageDataUrl && <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <img src={data.imageDataUrl} style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: `1.5px solid #e2e8f0` }} />
+          <button onClick={() => set('imageDataUrl', '')} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(15,23,42,.7)', color: '#fff', border: 'none', borderRadius: '5px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer' }}>✕ Remove</button>
+        </div>}
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+          const f = e.target.files[0]; if (!f) return;
+          const r = new FileReader(); r.onload = ev => set('imageDataUrl', ev.target.result); r.readAsDataURL(f);
+        }} />
+        <button onClick={() => fileRef.current.click()} style={{ display: 'block', width: '100%', padding: '10px', border: `1.5px dashed #cbd5e1`, borderRadius: '8px', background: "#f8fafc", color: "#64748b", fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s ease' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.color = '#4f46e5'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}>📎 Choose image…</button>
+      </Field>
 
       <Field label="Target Contacts by List & Status">
         {!lists.length
@@ -267,17 +314,19 @@ export function CampaignModal({ campaign, lists, settings, contacts, forms = [],
               const pc = campaignPhones([selection || list.id], contacts).length;
 
               return (
-                <div key={list.id} style={{ display: 'flex', flexDirection: 'column', border: `1.5px solid ${sel ? "#4f46e5" : "#e2e8f0"}`, borderRadius: '10px', overflow: 'hidden', background: sel ? "#f5f3ff" : '#fff', transition: 'all 0.15s' }}>
-                  <div onClick={() => handleToggleList(list.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 18px', cursor: 'pointer', flex: 1, boxSizing: 'border-box', width: '100%' }}>
-                    <input type="checkbox" checked={sel} onChange={() => handleToggleList(list.id)} onClick={e => e.stopPropagation()} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: "#4f46e5", cursor: 'pointer', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '15.5px', fontWeight: 800, color: list.status === 'inactive' ? "#64748b" : "#0f172a", lineHeight: '1.3', wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div key={list.id} style={{ display: 'flex', flexDirection: 'column', border: `1.5px solid ${sel ? "#4f46e5" : "#e2e8f0"}`, borderRadius: '10px', overflow: 'hidden', background: sel ? "#f5f3ff" : '#fff', transition: 'all 0.15s ease', boxShadow: sel ? '0 2px 8px rgba(79,70,229,0.04)' : 'none' }}>
+                  <div onClick={() => handleToggleList(list.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', cursor: 'pointer', flex: 1, boxSizing: 'border-box', width: '100%' }}>
+                    <input type="checkbox" checked={sel} onChange={() => handleToggleList(list.id)} onClick={e => e.stopPropagation()} style={{ width: '18px', height: '18px', accentColor: "#4f46e5", cursor: 'pointer', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ fontSize: '14.5px', fontWeight: 800, color: list.status === 'inactive' ? "#64748b" : "#0f172a", lineHeight: '1.3', wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {list.name}
                         {list.status === 'inactive' && (
                           <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#e2e8f0', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Inactive</span>
                         )}
                       </div>
-                      <div style={{ fontSize: '12.5px', color: "#64748b", fontWeight: 500, marginTop: '4px', lineHeight: '1.4' }}>{pc} contact{pc !== 1 ? 's' : ''} targeted</div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', background: '#e0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '4px' }}>
+                        {pc} contact{pc !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                   {sel && (
@@ -298,9 +347,10 @@ export function CampaignModal({ campaign, lists, settings, contacts, forms = [],
             })}
           </div>
         }
-        <p style={{ fontSize: '12px', color: "#64748b", paddingTop: '12px', fontStyle: 'italic' }}>
-          {phones.length ? `${phones.length} unique phone number${phones.length !== 1 ? 's' : ''} will receive this campaign.` : 'No phone numbers yet.'}
-        </p>
+        <div style={{ fontSize: '12.5px', color: "#64748b", paddingTop: '12px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>ℹ️</span>
+          <span>{phones.length ? `Matches ${phones.length} unique phone number${phones.length !== 1 ? 's' : ''} for execution.` : 'No active phone numbers targeted.'}</span>
+        </div>
       </Field>
     </Modal>
   );

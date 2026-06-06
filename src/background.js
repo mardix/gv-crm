@@ -70,6 +70,78 @@ function pollInTab(tabId, fn, timeout = 8000, ...args) {
   });
 }
 
+function personalizeCampaignMessage(message = '', entry = {}) {
+  if (!message) return '';
+  const firstName = (entry.name || '').split(' ')[0] || entry.name || '';
+  const values = {
+    name: firstName,
+    email: entry.email || '',
+    phone: entry.phone || '',
+    handle: entry.handle || '',
+    contactid: entry.id || entry.contactId || '',
+    status: entry.status || '',
+    leadsource: entry.leadSource || '',
+    category: entry.category || '',
+    membershiplevel: entry.membershipLevel || ''
+  };
+
+  return message.replace(/{{\s*([^}]+?)\s*}}/g, (_, expression) => resolveTokenExpression(expression, values));
+}
+
+function splitTokenExpression(expression = '') {
+  const parts = [];
+  let current = '';
+  let quote = '';
+
+  for (const char of String(expression)) {
+    if ((char === '"' || char === "'") && !quote) {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === quote) {
+      quote = '';
+      current += char;
+      continue;
+    }
+    if (char === '|' && !quote) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+
+  parts.push(current.trim());
+  return parts.filter(Boolean);
+}
+
+function resolveTokenExpression(expression, values) {
+  const parts = splitTokenExpression(expression);
+
+  for (const part of parts) {
+    const literal = part.match(/^(['"])(.*)\1$/);
+    if (literal) return literal[2];
+
+    const value = values[part.toLowerCase()];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value);
+    }
+  }
+
+  return '';
+}
+
+function buildCampaignAttachement(imageData) {
+  if (!imageData) return null;
+  const match = String(imageData).match(/^data:([^;,]+)[;,]/);
+  return {
+    name: 'campaign-image',
+    contentType: match ? match[1] : '',
+    dataUrl: imageData
+  };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'openChat') {
     const executeOpenChat = async (tid) => {
@@ -234,6 +306,17 @@ async function runCampaign(tabId, { id, type, form, phones, message, imageData, 
 
   const isSms = !type || type === 'sms';
 
+  if (!isSms) {
+    try {
+      await runFormCampaign(tabId, { id, form, phones, message, imageData });
+      return { success: true };
+    } finally {
+      sendingCampaignId = null;
+      broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'done' });
+      broadcast(tabId, { type: 'campaignDone', campaignId: id });
+    }
+  }
+
   const randomDelay = () => {
     const minMs = (delayMin || 20) * 1000;
     const maxMs = (delayMax || 60) * 1000;
@@ -255,15 +338,7 @@ async function runCampaign(tabId, { id, type, form, phones, message, imageData, 
     const phone = entry.phone;
 
     if (isSms) {
-      let finalMessage = message;
-      if (finalMessage) {
-        const firstName = (entry.name || '').split(' ')[0] || entry.name || '';
-        // Replace {{ token }} — spaces around token name are ignored
-        finalMessage = finalMessage.replace(/{{\s*name\s*}}/gi, firstName);
-        finalMessage = finalMessage.replace(/{{\s*email\s*}}/gi, entry.email || '');
-        finalMessage = finalMessage.replace(/{{\s*phone\s*}}/gi, entry.phone || '');
-        finalMessage = finalMessage.replace(/{{\s*handle\s*}}/gi, entry.handle || '');
-      }
+      const finalMessage = personalizeCampaignMessage(message, entry);
 
       try {
         broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'sending', current: entry, next: phones[i + 1] || null, sent: i, total: phones.length });
@@ -276,71 +351,6 @@ async function runCampaign(tabId, { id, type, form, phones, message, imageData, 
           broadcast(null, { type: 'campaignRateLimit', campaignId: id });
           break;
         }
-      }
-    } else {
-      // Form Campaign
-      try {
-        broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'sending', current: entry, next: phones[i + 1] || null, sent: i, total: phones.length });
-        
-        // Construct form submission payload
-        const payload = {
-          crm_contact_id: entry.id || '',
-          crm_contact_name: entry.name || '',
-          crm_contact_phone: entry.phone || '',
-          crm_contact_email: entry.email || '',
-          crm_contact_handle: entry.handle || '',
-          crm_contact_location: entry.location || '',
-          crm_contact_status: entry.status || '',
-          crm_contact_leadSource: entry.leadSource || '',
-          crm_contact_category: entry.category || '',
-          crm_contact_membershipLevel: entry.membershipLevel || ''
-        };
-        
-        // Autofill form fields
-        if (form && Array.isArray(form.fields)) {
-          form.fields.forEach(f => {
-            let val = f.value || '';
-            if (f.autofill && entry[f.autofill]) {
-              val = entry[f.autofill];
-            }
-            payload[f.name] = val;
-          });
-        }
-
-        const endpoint = form?.endpointUrl || '';
-        const contentType = form?.contentType || 'json';
-        const headers = { 'Content-Type': contentType === 'text' ? 'text/plain' : 'application/json' };
-
-        const fetchRes = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload)
-        });
-
-        if (!fetchRes.ok) {
-          throw new Error(`HTTP ${fetchRes.status}: ${fetchRes.statusText}`);
-        }
-
-        const text = await fetchRes.text();
-        let resultOk = true;
-        let errorMsg = '';
-        try {
-          const json = JSON.parse(text);
-          if (json.ok === false || json.success === false) {
-            resultOk = false;
-            errorMsg = json.error || json.message || 'API rejected submission';
-          }
-        } catch (e) {
-          // not JSON, keep ok as true
-        }
-
-        if (resultOk) {
-          broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: true });
-        } else {
-          throw new Error(errorMsg);
-        }
-      } catch (e) {
-        broadcast(tabId, { type: 'campaignProgress', campaignId: id, phone, name: entry.name, success: false, error: e.message });
       }
     }
 
@@ -363,6 +373,130 @@ async function runCampaign(tabId, { id, type, form, phones, message, imageData, 
   broadcast(tabId, { type: 'campaignStatus', campaignId: id, state: 'done' });
   broadcast(tabId, { type: 'campaignDone', campaignId: id });
   return { success: true };
+}
+
+function buildFormRecipientPayload(entry, message = '') {
+  const contact = {
+    id: entry.id || '',
+    contactId: entry.id || '',
+    name: entry.name || '',
+    phone: entry.phone || '',
+    email: entry.email || '',
+    handle: entry.handle || '',
+    location: entry.location || '',
+    status: entry.status || '',
+    leadSource: entry.leadSource || '',
+    category: entry.category || '',
+    membershipLevel: entry.membershipLevel || ''
+  };
+
+  const fields = {
+    crm_contact_id: contact.id,
+    crm_contact_name: contact.name,
+    crm_contact_phone: contact.phone,
+    crm_contact_email: contact.email,
+    crm_contact_handle: contact.handle,
+    crm_contact_location: contact.location,
+    crm_contact_status: contact.status,
+    crm_contact_leadSource: contact.leadSource,
+    crm_contact_category: contact.category,
+    crm_contact_membershipLevel: contact.membershipLevel
+  };
+
+  return {
+    contact,
+    message: personalizeCampaignMessage(message, entry),
+    fields
+  };
+}
+
+function parseFormFields(form) {
+  const parsed = {};
+  if (!form || !Array.isArray(form.fields)) return parsed;
+
+  form.fields.forEach(field => {
+    const name = String(field.name || '').trim();
+    if (!name) return;
+    parsed[name] = field.value || '';
+  });
+
+  return parsed;
+}
+
+function readApiResponse(text) {
+  try {
+    const json = JSON.parse(text);
+    if (json.ok === false || json.success === false) {
+      return { ok: false, error: json.error || json.message || 'API rejected campaign' };
+    }
+    return { ok: true, json };
+  } catch (e) {
+    return { ok: true };
+  }
+}
+
+async function runFormCampaign(tabId, { id, form, phones, message, imageData }) {
+  const endpoint = form?.endpointUrl || '';
+  if (!endpoint) throw new Error('Form endpoint URL is missing');
+
+  const contentType = form?.contentType || 'json';
+  const headers = { 'Content-Type': contentType === 'text' ? 'text/plain' : 'application/json' };
+  const recipients = (phones || []).map(entry => buildFormRecipientPayload(entry, message));
+  const campaignPayload = {
+    ...parseFormFields(form),
+    data: {
+      campaign: {
+        id,
+        type: 'form',
+        formId: form?.id || '',
+        formName: form?.name || '',
+        message: message || '',
+        sentAt: new Date().toISOString(),
+        totalRecipients: recipients.length
+      },
+      attachement: buildCampaignAttachement(imageData),
+      recipients
+    }
+  };
+
+  broadcast(tabId, {
+    type: 'campaignStatus',
+    campaignId: id,
+    state: 'sending',
+    current: recipients[0]?.contact || null,
+    next: recipients[1]?.contact || null,
+    sent: 0,
+    total: recipients.length
+  });
+
+  try {
+    const fetchRes = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(campaignPayload)
+    });
+
+    if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}: ${fetchRes.statusText}`);
+
+    const responseText = await fetchRes.text();
+    const apiResult = readApiResponse(responseText);
+    if (!apiResult.ok) throw new Error(apiResult.error);
+
+    broadcast(tabId, {
+      type: 'campaignBulkProgress',
+      campaignId: id,
+      success: true,
+      recipients: phones.map(entry => ({ phone: entry.phone, name: entry.name }))
+    });
+  } catch (e) {
+    broadcast(tabId, {
+      type: 'campaignBulkProgress',
+      campaignId: id,
+      success: false,
+      error: e.message,
+      recipients: phones.map(entry => ({ phone: entry.phone, name: entry.name }))
+    });
+  }
 }
 
 async function executePayload(tabId, number, message, imageData, autoSend) {

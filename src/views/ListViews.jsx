@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
-import { palFor, campaignPhones, CAMP_PAL } from '../utils/utils';
+import { palFor, campaignPhones, CAMP_PAL, avatarColor, ini } from '../utils/utils';
 
 export function ListsView({ lists, contacts, settings, search, onEdit, onDelete, onFilter }) {
   const [inactiveExpanded, setInactiveExpanded] = useState(false);
@@ -276,318 +276,936 @@ function downloadReport(camp, totalCount, livePhones) {
 }
 
 
+function renderMessageWithHighlightedTokens(message) {
+  if (!message) return null;
+  const parts = message.split(/(\{\{[^}]+\}\})/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('{{') && part.endsWith('}}')) {
+      return (
+        <span
+          key={index}
+          style={{
+            background: '#eef2ff',
+            color: '#4338ca',
+            border: '1.5px solid #c7d2fe',
+            padding: '2px 6px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 700,
+            fontFamily: 'Inter, sans-serif',
+            display: 'inline-block',
+            margin: '0 2px',
+            verticalAlign: 'middle'
+          }}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
+function CampaignCard({ camp, contacts, lists, activeStatus, isStandalone, forms, onEdit, onUpdate, onDelete, onDuplicate, isExpanded, onToggleExpanded }) {
+  const [reportExpanded, setReportExpanded] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logFilter, setLogFilter] = useState('all'); // all, sent, failed, pending
+  const [visibleCount, setVisibleCount] = useState(25);
+
+  const [sbg, sfg] = CAMP_PAL[camp.status] || CAMP_PAL.draft;
+  const isLocked = !['draft', 'ready'].includes(camp.status);
+  const livePhones = campaignPhones(camp.listIds || [], contacts);
+  const totalCount = isLocked && camp.totalRecipients != null ? camp.totalRecipients : livePhones.length;
+  const log = camp.log || [];
+  const sent = log.filter(l => l.ok).length, failed = log.filter(l => !l.ok).length;
+  const pendingCount = totalCount - log.length;
+  const showAsPaused = camp.status === 'paused' || (camp.status === 'done' && (failed > 0 || pendingCount > 0));
+  const isDraft = !isLocked;
+
+  const listNames = (camp.listIds || []).map(entry => {
+    const id = typeof entry === 'string' ? entry : entry.listId;
+    const status = typeof entry === 'string' ? '' : entry.status;
+    const l = lists.find(x => x.id === id);
+    return l ? `${l.name}${status ? ` (${status})` : ''}` : null;
+  }).filter(Boolean).join(', ');
+
+  const rawRoster = camp.recipients && camp.recipients.length > 0
+    ? camp.recipients.map(r => {
+      const entry = log.find(l => l.phone === r.phone);
+      if (!entry) return { ...r, status: 'pending' };
+      return { ...r, name: r.name || entry.name, status: entry.ok ? 'sent' : 'failed', ts: entry.ts, error: entry.error };
+    })
+    : isDraft && livePhones.length > 0
+      ? livePhones.map(p => ({ phone: p.phone, name: p.name || '', status: 'pending' }))
+      : log.map(l => ({ phone: l.phone, name: l.name, status: l.ok ? 'sent' : 'failed', ts: l.ts, error: l.error }));
+
+  const filteredRoster = rawRoster.filter(r => {
+    if (logFilter !== 'all') {
+      if (logFilter === 'sent' && r.status !== 'sent') return false;
+      if (logFilter === 'failed' && r.status !== 'failed') return false;
+      if (logFilter === 'pending' && r.status !== 'pending') return false;
+    }
+    if (logSearch) {
+      const q = logSearch.toLowerCase();
+      return (r.name || '').toLowerCase().includes(q) || (r.phone || '').includes(q) || (r.error || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  return (
+    <div className={`campaign-card-container ${isExpanded ? 'expanded' : ''}`}>
+      {/* COMPACT HEADER */}
+      <div
+        style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', background: isExpanded ? '#fbfcfe' : 'transparent', transition: 'background-color 0.2s' }}
+        onClick={onToggleExpanded}
+      >
+        <div style={{
+          width: '42px',
+          height: '42px',
+          borderRadius: '50%',
+          background: camp.type === 'form' ? '#fdf2f8' : '#eef2ff',
+          border: `1.5px solid ${camp.type === 'form' ? '#fbcfe8' : '#e0e7ff'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '20px',
+          flexShrink: 0,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+        }}>
+          {camp.type === 'form' ? '📋' : '💬'}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '16.5px', fontWeight: 800, color: "#0f172a", lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.name}</div>
+            <Badge text={camp.status || 'draft'} bg={sbg} fg={sfg} />
+            <Badge text={camp.type === 'form' ? 'Form Sync' : 'SMS Broadcast'} bg={camp.type === 'form' ? '#fdf2f8' : '#eef2ff'} fg={camp.type === 'form' ? '#db2777' : '#4f46e5'} />
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 500, display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px' }}>
+              {totalCount} recipient{totalCount !== 1 ? 's' : ''}
+            </span>
+            <span style={{ color: '#cbd5e1' }}>•</span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
+              {listNames || 'Internal Selection'}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '90px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', lineHeight: 1 }}>Created</div>
+          <div style={{ fontSize: '13px', color: '#475569', fontWeight: 800, lineHeight: 1 }}>{new Date(camp.createdAt || Date.now()).toLocaleDateString()}</div>
+        </div>
+
+        <div style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '8px',
+          border: '1.5px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          color: '#94a3b8',
+          background: isExpanded ? '#f8fafc' : '#ffffff',
+          transition: 'all 0.2s',
+          transform: isExpanded ? 'rotate(180deg)' : 'none',
+          cursor: 'pointer',
+          marginLeft: '10px'
+        }}>
+          ▼
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div style={{
+          borderTop: '1.5px solid #e2e8f0',
+          background: '#f8fafc',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          {/* Visual Progress Bar & Premium Statistics Card Grid */}
+          {(camp.status !== 'draft' || camp.completedAt) && (
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+            }}>
+              {camp.status !== 'draft' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '10.5px', fontWeight: 950, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Execution Progress</span>
+                    <span style={{ fontSize: '12.5px', fontWeight: 850, color: '#4f46e5' }}>
+                      {totalCount > 0 ? Math.round((log.length / totalCount) * 100) : 0}% ({log.length} of {totalCount} sent)
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '10px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden', border: '1px solid #e2e8f0', position: 'relative' }}>
+                    <div
+                      className={`campaign-progress-fill ${camp.status === 'running' ? 'campaign-progress-fill-animate' : ''}`}
+                      style={{
+                        width: `${totalCount > 0 ? Math.round((log.length / totalCount) * 100) : 0}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #6366f1, #4f46e5)',
+                        borderRadius: '99px',
+                        transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        backgroundSize: '30px 30px',
+                        backgroundImage: camp.status === 'running' ? 'linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)' : 'none'
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '12px' }}>
+                {[
+                  { val: totalCount, label: 'Total Recipients', color: '#4f46e5', bg: '#f5f3ff', border: '#e0e7ff' },
+                  { val: sent, label: 'Delivered', color: '#10b981', bg: '#f0fdf4', border: '#dcfce7' },
+                  { val: failed, label: 'Failed', color: '#ef4444', bg: '#fef2f2', border: '#fee2e2' }
+                ].map((card, idx) => (
+                  <div key={idx} className="campaign-stat-card" style={{ background: card.bg, border: `1.5px solid ${card.border}`, borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)', transition: 'all 0.2s ease' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: card.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{card.val}</div>
+                    <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{card.label}</div>
+                  </div>
+                ))}
+                {camp.completedAt && (
+                  <div className="campaign-stat-card" style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', transition: 'all 0.2s ease' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#16a34a', lineHeight: 1.4, height: '24px', display: 'flex', alignItems: 'center' }}>
+                      {new Date(camp.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Finished At</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Configuration Card (Targeted Lists / Form Configuration) */}
+          {((camp.listIds && camp.listIds.length > 0) || camp.type === 'form') && (
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+            }}>
+              {camp.listIds && camp.listIds.length > 0 && (
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '10px', letterSpacing: '0.8px' }}>Targeted Lists</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {camp.listIds.map((entry, idx) => {
+                      const id = typeof entry === 'string' ? entry : entry.listId;
+                      const status = typeof entry === 'string' ? '' : entry.status;
+                      const l = lists.find(x => x.id === id);
+                      if (!l) return null;
+                      return (
+                        <span key={idx} style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          background: '#f8fafc',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '20px',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          color: '#334155'
+                        }}>
+                          📁 {l.name}
+                          {status && (
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              color: '#4f46e5',
+                              background: '#eef2ff',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {status}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {camp.type === 'form' && (
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '10px', letterSpacing: '0.8px' }}>Form Sync Configuration</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '10px', color: '#9d174d', fontSize: '13.5px', fontWeight: 650 }}>
+                    <span>🎯 Target Form:</span>
+                    <span style={{ color: '#0f172a', fontWeight: 800 }}>
+                      {forms.find(x => x.id === camp.formId)?.name || 'Deleted Form'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Message Content Card */}
+          {camp.message && (
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+            }}>
+              <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', letterSpacing: '0.8px' }}>
+                {camp.type === 'form' ? 'Payload Message Template' : 'SMS Message Configuration'}
+              </span>
+              <div style={{ padding: '16px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', color: '#475569', fontSize: '13.5px', lineHeight: 1.6 }}>
+                {renderMessageWithHighlightedTokens(camp.message)}
+              </div>
+              {camp.imageDataUrl && <div style={{ marginTop: '8px' }}><img src={camp.imageDataUrl} style={{ maxWidth: '160px', borderRadius: '12px', border: '1px solid #eef2f6', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} /></div>}
+            </div>
+          )}
+
+          {/* Google Voice Launch Banner Card */}
+          {isStandalone && (!camp.type || camp.type === 'sms') && (camp.status === 'draft' || camp.status === 'ready' || showAsPaused || (failed > 0 && camp.status !== 'running')) && (
+            <div style={{
+              padding: '16px 20px',
+              border: '1.5px solid #fde68a',
+              borderRadius: '12px',
+              background: '#fffbeb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+            }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '18px' }}>⚠️</span>
+                <div style={{ fontSize: '13px', color: '#92400e', fontWeight: 700, textAlign: 'left', lineHeight: 1.4 }}>
+                  Campaigns must be launched or resumed from the Google Voice interface. Please open Google Voice to proceed.
+                </div>
+              </div>
+              <button
+                onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                style={{
+                  padding: '8px 16px',
+                  background: '#d97706',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
+                  transition: 'all 0.12s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#b45309'}
+                onMouseLeave={e => e.currentTarget.style.background = '#d97706'}
+              >
+                Go to Google Voice ↗
+              </button>
+            </div>
+          )}
+
+          {/* Live HUD Card */}
+          {activeStatus && activeStatus.campaignId === camp.id && (
+            <div style={{
+              padding: '20px',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(79, 70, 229, 0.05) 100%)',
+              border: '1.5px solid #c7d2fe',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: '#4f46e5',
+                  animation: 'vcrm-pulse 1.5s infinite',
+                  boxShadow: '0 0 0 4px rgba(79,70,229,0.2)'
+                }}></div>
+                <span style={{ fontSize: '14.5px', fontWeight: 800, color: '#4338ca', letterSpacing: '0.2px' }}>
+                  {activeStatus.state === 'waiting' ? `Next Dispatch in ${activeStatus.delay}s` : 'Processing automation dispatch...'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#ffffff', border: '1.5px solid #e0e7ff', borderRadius: '10px', padding: '16px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.04)' }}>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px' }}>Active Target</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {activeStatus.current ? (activeStatus.current.name || activeStatus.current.phone) : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px' }}>Queue Progress</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {activeStatus.next ? (activeStatus.next.name || activeStatus.next.phone) : 'Wrap-up phase'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#4338ca', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⚠️</span>
+                <span>Keep this tab active and visible while automation is running.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Execution Report / Preview Roster Card */}
+          <div style={{
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 1px 2px rgba(15,23,42,0.02)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Collapse Trigger Bar */}
+            <div
+              style={{
+                background: '#f8fafc',
+                padding: '16px 20px',
+                borderBottom: reportExpanded ? '1.5px solid #e2e8f0' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+              onClick={() => setReportExpanded(!reportExpanded)}
+            >
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '1.2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📊 {isDraft ? 'Recipients Preview' : 'Execution Report'}
+                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'inline-block', transition: 'transform 0.15s ease', transform: reportExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+              </span>
+            </div>
+
+            {reportExpanded && (
+              <div>
+                {/* Search & Filter Toolbar */}
+                <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '13px' }}>🔍</span>
+                      <input
+                        type="text"
+                        value={logSearch}
+                        onInput={e => { setLogSearch(e.target.value); setVisibleCount(25); }}
+                        placeholder="Search by name, phone, or error..."
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 34px',
+                          fontSize: '13px',
+                          color: '#0f172a',
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '8px',
+                          outline: 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onFocus={e => { e.target.style.borderColor = '#4f46e5'; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.08)'; }}
+                        onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadReport(camp, totalCount, livePhones); }}
+                      style={{
+                        padding: '8px 14px',
+                        background: '#ffffff',
+                        color: '#4f46e5',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
+                    >
+                      Download CSV 📥
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { id: 'all', label: `All (${rawRoster.length})` },
+                      { id: 'sent', label: `Sent (${rawRoster.filter(r => r.status === 'sent').length})`, color: '#10b981', bg: '#f0fdf4' },
+                      { id: 'failed', label: `Failed (${rawRoster.filter(r => r.status === 'failed').length})`, color: '#ef4444', bg: '#fef2f2' },
+                      { id: 'pending', label: `Pending (${rawRoster.filter(r => r.status === 'pending').length})`, color: '#f59e0b', bg: '#fffbeb' }
+                    ].map(tab => {
+                      const isActive = logFilter === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => { setLogFilter(tab.id); setVisibleCount(25); }}
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: isActive ? `1.5px solid ${tab.color || '#4f46e5'}` : '1.5px solid #e2e8f0',
+                            background: isActive ? (tab.bg || '#eef2ff') : '#ffffff',
+                            color: isActive ? (tab.color || '#4f46e5') : '#64748b',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Table Container */}
+                <div style={{ maxHeight: '380px', overflowY: 'auto', display: 'block', background: '#f8fafc', padding: '0 20px 20px 20px' }}>
+                  {filteredRoster.length === 0 ? (
+                    <div style={{ padding: '50px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px', fontStyle: 'italic' }}>
+                      No matching recipients found.
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', fontSize: '12.5px', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 8px', tableLayout: 'fixed' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>
+                        <tr>
+                          <th style={{ padding: '10px 14px', fontWeight: 800, color: '#64748b', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid #e2e8f0', width: '110px' }}>Time</th>
+                          <th style={{ padding: '10px 14px', fontWeight: 800, color: '#64748b', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid #e2e8f0' }}>Recipient</th>
+                          <th style={{ padding: '10px 14px', fontWeight: 800, color: '#64748b', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid #e2e8f0', width: '130px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRoster.slice(0, visibleCount).map((r, i) => {
+                          const cellStyle = (isFirst, isLast) => ({
+                            padding: '12px 14px',
+                            verticalAlign: 'middle',
+                            background: '#ffffff',
+                            borderTop: '1.5px solid #e2e8f0',
+                            borderBottom: '1.5px solid #e2e8f0',
+                            transition: 'all 0.15s ease',
+                            ...(isFirst ? { borderLeft: '1.5px solid #e2e8f0', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px' } : {}),
+                            ...(isLast ? { borderRight: '1.5px solid #e2e8f0', borderTopRightRadius: '10px', borderBottomRightRadius: '10px' } : {})
+                          });
+
+                          return (
+                            <tr key={i}>
+                              <td style={cellStyle(true, false)}>
+                                <span style={{ color: '#94a3b8', fontWeight: 650, fontFamily: '"DM Mono",monospace', fontSize: '11.5px' }}>
+                                  {r.ts ? new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </span>
+                              </td>
+                              <td style={cellStyle(false, false)}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: '#fff', background: avatarColor(r.name || r.phone), flexShrink: 0 }}>
+                                    {ini(r.name || r.phone)}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ color: '#0f172a', fontWeight: 700, fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name || 'Private Contact'}</div>
+                                    <div style={{ color: '#64748b', fontSize: '11px', fontFamily: '"DM Mono",monospace' }}>{r.phone}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={cellStyle(false, true)}>
+                                {r.status === 'sent' && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 800 }}>
+                                    🟢 Sent
+                                  </span>
+                                )}
+                                {r.status === 'failed' && (
+                                  <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '2px' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 800, width: 'max-content' }}>
+                                      🔴 Failed
+                                    </span>
+                                    {r.error && <span style={{ fontSize: '10px', color: '#ef4444', fontStyle: 'italic', display: 'block', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.error}>{r.error}</span>}
+                                  </div>
+                                )}
+                                {r.status === 'pending' && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f59e0b', background: '#fffbeb', border: '1px solid #fef3c7', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 800 }}>
+                                    ⏳ Pending
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {filteredRoster.length > visibleCount && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 0 0' }}>
+                      <button
+                        onClick={() => setVisibleCount(c => c + 25)}
+                        style={{
+                          padding: '8px 18px',
+                          background: '#ffffff',
+                          color: '#4f46e5',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.background = '#f5f3ff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
+                      >
+                        Show More (+25 Recipients)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons Card */}
+          <div style={{
+            padding: '16px 20px',
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+          }}>
+            {(camp.status === 'draft' || camp.status === 'ready' || showAsPaused) && (
+              <button
+                onClick={() => onEdit(camp)}
+                style={{
+                  padding: '9px 16px',
+                  background: '#ffffff',
+                  color: '#4f46e5',
+                  border: '1.5px solid #4f46e5',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#f5f3ff'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+              >
+                Edit
+              </button>
+            )}
+
+            {(camp.status === 'draft' || camp.status === 'ready') && (
+              (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                <button
+                  onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1.5px solid #fde68a',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb'; }}
+                  title="Campaigns must be launched from the Google Voice page"
+                >
+                  ⚠️ Open GV to Launch
+                </button>
+              ) : (
+                <button
+                  onClick={() => onUpdate(camp.id, 'start')}
+                  style={{
+                    padding: '9px 18px',
+                    background: '#10b981',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s',
+                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.2)'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+                >
+                  ▶ Launch
+                </button>
+              )
+            )}
+
+            {camp.status === 'running' && (
+              <button
+                onClick={() => onUpdate(camp.id, 'pause')}
+                style={{
+                  padding: '9px 16px',
+                  background: '#64748b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#475569'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#64748b'; }}
+              >
+                ⏸ Pause
+              </button>
+            )}
+
+            {camp.status === 'running' && (
+              <button
+                onClick={() => onUpdate(camp.id, 'cancel')}
+                style={{
+                  padding: '9px 16px',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#ef4444'; }}
+              >
+                ✕ Cancel
+              </button>
+            )}
+
+            {showAsPaused && (
+              (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                <button
+                  onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1.5px solid #fde68a',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb'; }}
+                  title="Campaigns must be resumed from the Google Voice page"
+                >
+                  ⚠️ Open GV to Resume
+                </button>
+              ) : (
+                <button
+                  onClick={() => onUpdate(camp.id, 'resume')}
+                  style={{
+                    padding: '9px 18px',
+                    background: '#10b981',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s',
+                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.2)'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+                >
+                  ▶ Resume
+                </button>
+              )
+            )}
+
+            {showAsPaused && (
+              <button
+                onClick={() => onUpdate(camp.id, 'cancel')}
+                style={{
+                  padding: '9px 16px',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#ef4444'; }}
+              >
+                ✕ Cancel
+              </button>
+            )}
+
+            <button
+              onClick={() => onDuplicate(camp)}
+              style={{
+                padding: '9px 16px',
+                background: '#f5f7ff',
+                color: '#4f46e5',
+                border: '1.5px solid #c7d2fe',
+                borderRadius: '8px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.12s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#f5f7ff'; }}
+            >
+              ❐ Duplicate
+            </button>
+
+            {failed > 0 && camp.status !== 'running' && (
+              (isStandalone && (!camp.type || camp.type === 'sms')) ? (
+                <button
+                  onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1.5px solid #fde68a',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb'; }}
+                  title="Campaign retries must be launched from the Google Voice page"
+                >
+                  ⚠️ Open GV to Retry
+                </button>
+              ) : (
+                <button
+                  onClick={() => onUpdate(camp.id, 'retry-failed')}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1.5px solid #fde68a',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb'; }}
+                >
+                  ↺ Retry {failed} Failed
+                </button>
+              )
+            )}
+
+            <button
+              onClick={() => onDelete(camp.id)}
+              style={{
+                marginLeft: 'auto',
+                color: "#94a3b8",
+                border: 'none',
+                background: 'none',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}
+            >
+              🗑 Delete
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CampaignsView({ campaigns, contacts, lists, activeStatus, isStandalone, forms = [], onEdit, onUpdate, onDelete, onDuplicate }) {
   const [expandedId, setExpandedId] = useState(null);
-  const [reportExpandedId, setReportExpandedId] = useState(null);
 
   if (!campaigns.length) return <Empty icon="📣" text={"No campaigns yet.\nClick + New Campaign to create one."} />;
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', alignContent: 'start' }}>
-      {campaigns.map(camp => {
-        const [sbg, sfg] = CAMP_PAL[camp.status] || CAMP_PAL.draft;
-        const isLocked = !['draft', 'ready'].includes(camp.status);
-        // Keep full array for draft preview; locked campaigns use snapshot
-        const livePhones = campaignPhones(camp.listIds || [], contacts);
-        const totalCount = isLocked && camp.totalRecipients != null ? camp.totalRecipients : livePhones.length;
-        const log = camp.log || [];
-        const sent = log.filter(l => l.ok).length, failed = log.filter(l => !l.ok).length;
-        const pendingCount = totalCount - log.length;
-        const showAsPaused = camp.status === 'paused' || (camp.status === 'done' && (failed > 0 || pendingCount > 0));
-        const isExpanded = expandedId === camp.id;
-        const isReportExpanded = reportExpandedId === camp.id;
-        const isDraft = !isLocked;
-
-        // Extract list names for display
-        const listNames = (camp.listIds || []).map(entry => {
-          const id = typeof entry === 'string' ? entry : entry.listId;
-          const status = typeof entry === 'string' ? '' : entry.status;
-          const l = lists.find(x => x.id === id);
-          return l ? `${l.name}${status ? ` (${status})` : ''}` : null;
-        }).filter(Boolean).join(', ');
-
-        return (
-          <div key={camp.id} style={{ background: '#fff', border: `1px solid #e2e8f0`, borderRadius: '20px', overflow: 'hidden', boxShadow: isExpanded ? '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05)' : '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-            {/* COMPACT HEADER */}
-            <div
-              style={{ padding: '24px 28px', display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', background: isExpanded ? '#fbfcfe' : '#fff' }}
-              onClick={() => { setExpandedId(isExpanded ? null : camp.id); if (isExpanded) setReportExpandedId(null); }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '6px' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 800, color: "#0f172a", lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.name}</div>
-                  <Badge text={camp.status || 'draft'} bg={sbg} fg={sfg} />
-                </div>
-                <div style={{ fontSize: '13.5px', color: "#64748b", fontWeight: 500, display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span>{totalCount} recipients</span>
-                  <span style={{ color: '#e2e8f0' }}>•</span>
-                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{listNames || 'Internal Selection'}</span>
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '90px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', lineHeight: 1 }}>Created</div>
-                <div style={{ fontSize: '14px', color: '#475569', fontWeight: 800, lineHeight: 1 }}>{new Date(camp.createdAt || Date.now()).toLocaleDateString()}</div>
-              </div>
-
-              <div style={{ fontSize: '22px', color: '#cbd5e1', marginLeft: '10px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</div>
-            </div>
-
-            {isExpanded && (
-              <div style={{ borderTop: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
-                  {[[totalCount, 'Total'], [sent, 'Delivered'], [failed, 'Failed']].map(([n, l], i) => (
-                    <div key={i} style={{ flex: 1, padding: '20px 28px', borderRight: i < 2 ? `1px solid #f1f5f9` : 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ fontSize: '26px', fontWeight: 900, color: "#0f172a", fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{n}</div>
-                      <div style={{ fontSize: '11px', fontWeight: 800, color: "#94a3b8", textTransform: 'uppercase', letterSpacing: '0.8px' }}>{l}</div>
-                    </div>
-                  ))}
-                  {camp.completedAt && (
-                    <div style={{ flex: 1.5, padding: '20px 28px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 900, color: "#94a3b8", textTransform: 'uppercase', letterSpacing: '1px', lineHeight: 1 }}>Finished At</div>
-                      <div style={{ fontSize: '15px', fontWeight: 900, color: "#16a34a", lineHeight: 1 }}>{new Date(camp.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    </div>
-                  )}
-                </div>
-
-                {camp.listIds && camp.listIds.length > 0 && (
-                  <div style={{ padding: '24px 28px', borderBottom: `1px solid #f1f5f9`, background: '#fff' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Targeted Lists</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {camp.listIds.map((entry, idx) => {
-                        const id = typeof entry === 'string' ? entry : entry.listId;
-                        const status = typeof entry === 'string' ? '' : entry.status;
-                        const l = lists.find(x => x.id === id);
-                        if (!l) return null;
-                        return (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{l.name}</div>
-                            {status && <div style={{ fontSize: '11px', fontWeight: 700, color: '#4f46e5', background: '#eef2ff', padding: '3px 8px', borderRadius: '6px' }}>{status}</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {camp.type === 'form' ? (
-                  <div style={{ padding: '24px 28px', borderBottom: `1px solid #f1f5f9`, background: '#fdfdfe' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Form Campaign Configuration</span>
-                    <div style={{ padding: '16px', background: '#fff', border: '1px solid #eef2f6', borderRadius: '12px', color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                      Target Form: <strong style={{ color: '#0f172a' }}>{(() => {
-                        const f = forms.find(x => x.id === camp.formId);
-                        return f ? f.name : 'Deleted Form';
-                      })()}</strong>
-                    </div>
-                  </div>
-                ) : (
-                  camp.message && (
-                    <div style={{ padding: '24px 28px', borderBottom: `1px solid #f1f5f9`, background: '#fdfdfe' }}>
-                      <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '14px', letterSpacing: '0.8px' }}>Message Configuration</span>
-                      <div style={{ padding: '16px', background: '#fff', border: '1px solid #eef2f6', borderRadius: '12px', color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                        "{camp.message}"
-                      </div>
-                      {camp.imageDataUrl && <div style={{ marginTop: '20px' }}><img src={camp.imageDataUrl} style={{ maxWidth: '160px', borderRadius: '12px', border: '1px solid #eef2f6', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} /></div>}
-                    </div>
-                  )
-                )}
-
-                {isStandalone && (!camp.type || camp.type === 'sms') && (camp.status === 'draft' || camp.status === 'ready' || showAsPaused || (failed > 0 && camp.status !== 'running')) && (
-                  <div style={{ padding: '20px 28px', borderBottom: `1px solid #fef3c7`, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '18px' }}>📣</span>
-                      <div style={{ fontSize: '13px', color: '#92400e', fontWeight: 700, textAlign: 'left', lineHeight: 1.4 }}>
-                        Campaigns must be launched or resumed from the Google Voice interface. Please open Google Voice to proceed.
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
-                      style={{
-                        padding: '8px 16px',
-                        background: '#d97706',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontWeight: 800,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
-                        transition: 'all 0.12s'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#b45309'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#d97706'}
-                    >
-                      Go to Google Voice ↗
-                    </button>
-                  </div>
-                )}
-
-                {/* LIVE HUD */}
-                {activeStatus && activeStatus.campaignId === camp.id && (
-                  <div style={{ padding: '28px', background: '#eef2ff', borderBottom: '1px solid #e0e7ff' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#4f46e5', animation: 'vcrm-pulse 1.3s infinite', boxShadow: '0 0 0 5px rgba(79,70,229,0.1)' }}></div>
-                      <span style={{ fontSize: '15px', fontWeight: 900, color: '#4338ca' }}>
-                        {activeStatus.state === 'waiting' ? `Next Dispatch in ${activeStatus.delay}s` : 'Processing Automation Task...'}
-                      </span>
-                    </div>
-                    <div style={{ background: '#fff', border: '1px solid #e0e7ff', borderRadius: '18px', padding: '18px', display: 'flex', gap: '32px', boxShadow: '0 4px 15px rgba(67, 56, 202, 0.05)' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.8px' }}>Active Recipient</div>
-                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeStatus.current ? (activeStatus.current.name || activeStatus.current.phone) : '—'}</div>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.8px' }}>Queue Progress</div>
-                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeStatus.next ? (activeStatus.next.name || activeStatus.next.phone) : 'Almost Complete'}</div>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: '20px', fontSize: '13px', color: '#6366f1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      ⚠️ Critical: Do not minimize or close this tab while running.
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  style={{ background: '#f8fafc', padding: '18px 28px', borderBottom: isReportExpanded ? '1px solid #f1f5f9' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-                  onClick={() => setReportExpandedId(isReportExpanded ? null : camp.id)}
-                >
-                  <span style={{ fontSize: '12px', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
-                    {isDraft ? '👁 Recipients Preview' : '📊 Execution Report'} {isReportExpanded ? '▲' : '▼'}
-                  </span>
-                  <div style={{ display: 'flex', gap: '20px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); downloadReport(camp, totalCount, livePhones); }} style={{ background: 'none', border: 'none', color: '#4f46e5', fontWeight: 800, cursor: 'pointer', fontSize: '12px' }}>Download CSV</button>
-                  </div>
-                </div>
-
-                {isReportExpanded && (() => {
-                  // Draft: preview from live phones. Started: use snapshot. Fallback: log only.
-                  const roster = camp.recipients && camp.recipients.length > 0
-                    ? camp.recipients.map(r => {
-                      const entry = log.find(l => l.phone === r.phone);
-                      if (!entry) return { ...r, status: 'pending' };
-                      return { ...r, name: r.name || entry.name, status: entry.ok ? 'sent' : 'failed', ts: entry.ts, error: entry.error };
-                    })
-                    : isDraft && livePhones.length > 0
-                      ? livePhones.map(p => ({ phone: p.phone, name: p.name || '', status: 'pending' }))
-                      : log.map(l => ({ phone: l.phone, name: l.name, status: l.ok ? 'sent' : 'failed', ts: l.ts, error: l.error }));
-
-                  const pending = roster.filter(r => r.status === 'pending').length;
-
-                  if (roster.length === 0) return (
-                    <div style={{ padding: '50px 28px', textAlign: 'center', color: '#94a3b8', fontSize: '14px', fontStyle: 'italic', background: '#fff' }}>
-                      No activity logs available for this campaign session.
-                    </div>
-                  );
-
-                  return (
-                    <div style={{ borderBottom: `1px solid #f1f5f9`, maxHeight: '380px', overflowY: 'auto', display: 'block', background: '#fff' }}>
-                      {pending > 0 && (
-                        <div style={{ padding: '10px 28px', background: '#fffbeb', borderBottom: '1px solid #fef3c7', fontSize: '12px', color: '#92400e', fontWeight: 700 }}>
-                          ⏳ {pending} recipient{pending !== 1 ? 's' : ''} pending
-                        </div>
-                      )}
-                      <table style={{ width: '100%', fontSize: '13px', textAlign: 'left', borderCollapse: 'collapse' }}>
-                        <thead style={{ position: 'sticky', top: 0, background: '#fdfdfe', boxShadow: '0 1px 0 #e2e8f0', zIndex: 1 }}>
-                          <tr>
-                            <th style={{ padding: '14px 28px', fontWeight: 800, color: '#64748b', width: '110px' }}>Time</th>
-                            <th style={{ padding: '14px 28px', fontWeight: 800, color: '#64748b' }}>Recipient</th>
-                            <th style={{ padding: '14px 28px', fontWeight: 800, color: '#64748b', width: '130px' }}>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {roster.map((r, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid #f8fafc', background: r.status === 'pending' ? '#fafafa' : '#fff' }}>
-                              <td style={{ padding: '14px 28px', color: '#94a3b8', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
-                                {r.ts ? new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                              </td>
-                              <td style={{ padding: '14px 28px', verticalAlign: 'top', minWidth: '200px' }}>
-                                <div style={{ color: '#1e293b', fontWeight: 800, marginBottom: '4px', lineHeight: 1.2 }}>{r.name || 'Private Contact'}</div>
-                                <div style={{ color: '#64748b', fontSize: '11.5px', fontWeight: 600, letterSpacing: '0.2px', opacity: 0.8 }}>{r.phone}</div>
-                              </td>
-                              <td style={{ padding: '14px 28px', verticalAlign: 'top' }}>
-                                {r.status === 'sent' && (
-                                  <div style={{ color: '#10b981', fontWeight: 900 }}>✓ Sent</div>
-                                )}
-                                {r.status === 'failed' && (
-                                  <>
-                                    <div style={{ color: '#ef4444', fontWeight: 900, marginBottom: '4px' }}>✕ Failed</div>
-                                    {r.error && <div style={{ fontSize: '11px', color: '#ef4444', fontStyle: 'italic', lineHeight: 1.4 }}>{r.error}</div>}
-                                  </>
-                                )}
-                                {r.status === 'pending' && (
-                                  <div style={{ color: '#f59e0b', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>⏳ Pending</div>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })()}
-
-                <div style={{ padding: '24px 28px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', background: '#fff' }}>
-                  {(camp.status === 'draft' || camp.status === 'ready' || showAsPaused) && <Btn variant="sm" onClick={() => onEdit(camp)} style={{ padding: '10px 20px' }}>Edit</Btn>}
-                  {(camp.status === 'draft' || camp.status === 'ready') && (
-                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
-                      <Btn
-                        variant="sm"
-                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
-                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
-                        title="Campaigns must be launched from the Google Voice page"
-                      >
-                        ⚠️ Open GV to Launch
-                      </Btn>
-                    ) : (
-                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'start')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Launch</Btn>
-                    )
-                  )}
-
-                  {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'pause')} style={{ padding: '10px 20px', color: "#64748b" }}>⏸ Pause</Btn>}
-                  {camp.status === 'running' && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
-
-                  {showAsPaused && (
-                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
-                      <Btn
-                        variant="sm"
-                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
-                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
-                        title="Campaigns must be resumed from the Google Voice page"
-                      >
-                        ⚠️ Open GV to Resume
-                      </Btn>
-                    ) : (
-                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'resume')} style={{ padding: '10px 20px', color: '#166534', borderColor: '#86efac', background: '#dcfce7', fontWeight: 800 }}>▶ Resume</Btn>
-                    )
-                  )}
-                  {showAsPaused && <Btn variant="sm" onClick={() => onUpdate(camp.id, 'cancel')} style={{ padding: '10px 20px', color: "#ef4444" }}>✕ Cancel</Btn>}
-
-                  <Btn variant="sm" onClick={() => onDuplicate(camp)} style={{ padding: '10px 20px', color: '#4f46e5', borderColor: '#c7d2fe', background: '#f5f7ff' }}>❐ Duplicate</Btn>
-
-                  {failed > 0 && camp.status !== 'running' && (
-                    (isStandalone && (!camp.type || camp.type === 'sms')) ? (
-                      <Btn
-                        variant="sm"
-                        onClick={() => window.open('https://voice.google.com/u/0/messages', '_blank')}
-                        style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}
-                        title="Campaign retries must be launched from the Google Voice page"
-                      >
-                        ⚠️ Open GV to Retry
-                      </Btn>
-                    ) : (
-                      <Btn variant="sm" onClick={() => onUpdate(camp.id, 'retry-failed')} style={{ padding: '10px 20px', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 800 }}>↺ Retry {failed} Failed</Btn>
-                    )
-                  )}
-
-                  <Btn variant="sm" onClick={() => onDelete(camp.id)} style={{ marginLeft: 'auto', color: "#94a3b8", border: 'none', background: 'none', fontSize: '12px' }}>🗑 Delete</Btn>
-                </div>
-                <style>{`@keyframes vcrm-pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }`}</style>
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', alignContent: 'start', background: '#f8fafc' }}>
+      {campaigns.map(camp => (
+        <CampaignCard
+          key={camp.id}
+          camp={camp}
+          contacts={contacts}
+          lists={lists}
+          activeStatus={activeStatus}
+          isStandalone={isStandalone}
+          forms={forms}
+          onEdit={onEdit}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          isExpanded={expandedId === camp.id}
+          onToggleExpanded={() => setExpandedId(expandedId === camp.id ? null : camp.id)}
+        />
+      ))}
+      <style>{`
+        .campaign-card-container {
+          background: #ffffff;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(15,23,42,0.03);
+          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .campaign-card-container:hover {
+          border-color: #cbd5e1;
+          transform: translateY(-2.5px);
+          box-shadow: 0 12px 24px -10px rgba(15,23,42,0.08), 0 4px 12px -5px rgba(15,23,42,0.03);
+        }
+        .campaign-card-container.expanded {
+          border-color: #cbd5e1;
+          box-shadow: 0 16px 32px -12px rgba(15,23,42,0.12), 0 4px 16px -6px rgba(15,23,42,0.04);
+        }
+        .campaign-stat-card {
+          transition: all 0.2s ease;
+        }
+        .campaign-stat-card:hover {
+          transform: translateY(-1.5px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+        @keyframes progress-bar-shimmer {
+          0% { background-position: 0 0; }
+          100% { background-position: 30px 0; }
+        }
+        .campaign-progress-fill-animate {
+          animation: progress-bar-shimmer 1s linear infinite;
+        }
+        @keyframes vcrm-pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.15); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }

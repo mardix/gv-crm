@@ -48,6 +48,7 @@ export function App({ togBtn }) {
   const [bulkSelCollapsed, setBulkSelCollapsed] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
+  const [screenLocked, setScreenLocked] = useState(false);
   const isWorking = syncing || activeCampaignStatus !== null;
 
   useEffect(() => {
@@ -109,6 +110,16 @@ export function App({ togBtn }) {
     let gsStatus = 'Active';
     if (s === 'inactive') gsStatus = 'Inactive';
     else if (s === 'banned') gsStatus = 'Banned';
+    const assignedLists = (c.lists || []).map(l => ({ listId: l.listId, status: l.status || 'Prospect' }));
+    const contactLists = assignedLists.map(membership => {
+      const list = lists.find(l => l.id === membership.listId);
+      return {
+        ...membership,
+        name: list?.name || '',
+        description: list?.description || '',
+        listStatus: list?.status || ''
+      };
+    });
 
     return {
       contactId: c.id,
@@ -122,7 +133,8 @@ export function App({ togBtn }) {
       location: c.location || '',
       handle: c.handle,
       note: c.comment,
-      assignedLists: (c.lists || []).map(l => ({ listId: l.listId, status: l.status || 'Prospect' }))
+      assignedLists,
+      lists: contactLists
     };
   }
 
@@ -193,14 +205,15 @@ export function App({ togBtn }) {
     return isNaN(d.getTime()) ? new Date(0) : d;
   }
 
-  async function syncConfigurationSnapshots() {
-    if (!settings.gsheetUrl) return;
+  async function syncConfigurationSnapshots(isLoadOnly = false, customUrl = null) {
+    const url = customUrl || settings.gsheetUrl;
+    if (!url) return;
 
     const localTime = localStorage.getItem('vcrm_config_modified_at') || new Date(0).toISOString();
     console.log('Syncing configurations (Strategy A)... Local modified at:', localTime);
 
     // 1. Fetch metadata for CONFIG snapshot
-    const snapshotsRes = await sendGSheetAction('readDataSnapshots', {}, 'GET');
+    const snapshotsRes = await sendGSheetAction('readDataSnapshots', {}, 'GET', url);
     if (!snapshotsRes.ok) throw new Error(snapshotsRes.error || 'Failed to read snapshots metadata');
 
     const configMetadata = (snapshotsRes.snapshots || []).find(s => s.snapshotType === 'CONFIG' && s.snapshotName === 'CRM-CONFIG');
@@ -212,9 +225,9 @@ export function App({ togBtn }) {
       const parsedSheet = parseSafeDate(sheetTime);
       const parsedLocal = parseSafeDate(localTime);
 
-      if (parsedSheet.getTime() > parsedLocal.getTime()) {
-        console.log('Sheet configuration is newer. Downloading and merging...');
-        const detailRes = await sendGSheetAction('readDataSnapshot', { snapshotId: configMetadata.snapshotId }, 'GET');
+      if (isLoadOnly || parsedSheet.getTime() > parsedLocal.getTime()) {
+        console.log(isLoadOnly ? 'Load-only mode: Downloading and merging configuration...' : 'Sheet configuration is newer. Downloading and merging...');
+        const detailRes = await sendGSheetAction('readDataSnapshot', { snapshotId: configMetadata.snapshotId }, 'GET', url);
         if (detailRes.ok && detailRes.snapshot && detailRes.snapshot.data) {
           const payload = detailRes.snapshot.data;
           
@@ -265,6 +278,11 @@ export function App({ togBtn }) {
       }
     }
 
+    if (isLoadOnly) {
+      console.log('Syncing configurations: Skipping upload in load-only mode.');
+      return;
+    }
+
     // Local configuration is newer or none exists on sheet -> upload (exclude gsheetUrl)
     console.log('Local configurations are newer (or none on sheet). Uploading to cloud...');
     const cleanSettings = { ...settings };
@@ -274,7 +292,7 @@ export function App({ togBtn }) {
       snapshotName: 'CRM-CONFIG',
       snapshotMode: 'replace',
       data: { settings: cleanSettings, campaigns, forms }
-    });
+    }, 'POST', url);
 
     if (uploadRes && uploadRes.ok) {
       const serverTime = uploadRes.modifiedAt || uploadRes.createdAt || new Date().toISOString();
@@ -313,8 +331,9 @@ export function App({ togBtn }) {
     }
   }
 
-  async function handleGSheetSync(skipConfirm = false) {
-    if (!settings.gsheetUrl) return alert('Please enter an Apps Script URL in Settings first.');
+  async function handleGSheetSync(skipConfirm = false, isLoadOnly = false, customUrl = null) {
+    const url = customUrl || settings.gsheetUrl;
+    if (!url) return alert('Please enter an Apps Script URL in Settings first.');
     if (!skipConfirm) {
       const ok = confirm('Perform a full two-way sync with Google Sheets? This will pull latest data from your spreadsheet, merge it with local data, and push the final results back to ensure both are identical.');
       if (!ok) return false;
@@ -324,7 +343,7 @@ export function App({ togBtn }) {
     try {
       // PHASE 1: FETCH (Pull & Merge)
       console.log('Sync Phase 1: Fetching lists...');
-      const listRes = await sendGSheetAction('readContactLists', {}, 'GET');
+      const listRes = await sendGSheetAction('readContactLists', {}, 'GET', url);
       if (!listRes.ok) throw new Error(listRes.error || 'Failed to fetch lists');
 
       const sheetLists = (listRes.lists || []).map(l => ({
@@ -337,7 +356,7 @@ export function App({ togBtn }) {
       }));
 
       console.log('Sync Phase 2: Fetching contacts...');
-      const contactRes = await sendGSheetAction('readContacts', { includeLists: true }, 'GET');
+      const contactRes = await sendGSheetAction('readContacts', { includeLists: true }, 'GET', url);
       if (!contactRes.ok) throw new Error(contactRes.error || 'Failed to fetch contacts');
 
       const sheetContacts = (contactRes.contacts || []).map(c => ({
@@ -387,23 +406,30 @@ export function App({ togBtn }) {
       });
 
       // PHASE 3: PUSH (Final Push back to GSheet)
-      console.log('Sync Phase 3: Pushing merged state back to GSheet...');
-      await gsheetSaveContactLists(updatedLists);
-      const pushRes = await gsheetSaveContacts(updatedContacts, 100);
+      let pushOk = true;
+      if (isLoadOnly) {
+        console.log('Sync Phase 3: Skipping push to GSheet (Load-only mode)');
+      } else {
+        console.log('Sync Phase 3: Pushing merged state back to GSheet...');
+        await gsheetSaveContactLists(updatedLists);
+        const pushRes = await gsheetSaveContacts(updatedContacts, 100);
+        if (!pushRes.ok) {
+          pushOk = false;
+          throw new Error(pushRes.error || 'Push phase failed');
+        }
+      }
 
-      if (pushRes.ok) {
+      if (pushOk) {
         setLists(updatedLists);
         setContacts(updatedContacts);
 
         console.log('Sync Phase 4: Synchronizing configurations (Strategy A)...');
-        await syncConfigurationSnapshots();
+        await syncConfigurationSnapshots(isLoadOnly, url);
 
         if (!skipConfirm) {
           alert(`✓ Targeted Sync Complete!\n- Pulled and merged data from spreadsheet.\n- Pushed final state (${updatedContacts.length} contacts) back to spreadsheet.\n- Synchronized Settings, Campaigns, and Forms.`);
         }
         return true;
-      } else {
-        throw new Error(pushRes.error || 'Push phase failed');
       }
     } catch (err) {
       alert('GSheet Sync Error: ' + err.message);
@@ -413,22 +439,23 @@ export function App({ togBtn }) {
     }
   }
 
-  async function handleOnboardingSetup(mode, url = '', appName = 'GV-CRM') {
+  async function handleOnboardingSetup(mode, url = '', appName = 'GV-CRM', passcode = '') {
     if (mode === 'local') {
-      setSettings(s => ({ ...s, syncMode: 'local', gsheetUrl: '', appName }));
+      setSettings(s => ({ ...s, syncMode: 'local', gsheetUrl: '', appName, passcode }));
       return true;
     } else {
       await new Promise(resolve => {
         setSettings(s => {
           setTimeout(resolve, 50);
-          return { ...s, gsheetUrl: url, syncMode: 'gsheet', appName };
+          return { ...s, gsheetUrl: url, appName, passcode };
         });
       });
-      const success = await handleGSheetSync(true);
+      const success = await handleGSheetSync(true, true, url);
       if (success) {
+        setSettings(s => ({ ...s, syncMode: 'gsheet' }));
         return true;
       } else {
-        setSettings(s => ({ ...s, syncMode: undefined }));
+        setSettings(s => ({ ...s, gsheetUrl: '', syncMode: undefined, passcode: '' }));
         return false;
       }
     }
@@ -446,6 +473,9 @@ export function App({ togBtn }) {
         loadedSettings.syncMode = loadedSettings.gsheetUrl ? 'gsheet' : undefined;
       }
       setSettings(loadedSettings);
+      if (loadedSettings.passcode) {
+        setScreenLocked(true);
+      }
       
       setTimeout(() => {
         setLoaded(true);
@@ -461,6 +491,17 @@ export function App({ togBtn }) {
     }
 
     const msgListener = (msg) => {
+      if (msg.type === 'campaignBulkProgress' && msg.campaignId && Array.isArray(msg.recipients)) {
+        setCampaigns(cs => cs.map(c => {
+          if (c.id !== msg.campaignId) return c;
+          const existingPhones = new Set((c.log || []).map(l => l.phone));
+          const ts = Date.now();
+          const newEntries = msg.recipients
+            .filter(r => !existingPhones.has(r.phone))
+            .map(r => ({ phone: r.phone, name: r.name, ok: msg.success, ts, error: msg.error }));
+          return { ...c, log: [...(c.log || []), ...newEntries] };
+        }));
+      }
       if (msg.type === 'campaignProgress' && msg.campaignId) {
         setCampaigns(cs => cs.map(c => {
           if (c.id !== msg.campaignId) return c;
@@ -722,17 +763,32 @@ export function App({ togBtn }) {
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const snapshotName = `APPSTATE-${todayStr}`;
+      
+      // 1. Save/update daily snapshot
       const res = await sendGSheetAction('saveDataSnapshot', {
         snapshotType: 'APPSTATE',
         snapshotName,
         snapshotMode: 'replace',
         data: { contacts, lists, campaigns, forms, settings }
       });
-      if (res && res.ok && res.snapshotId) {
-        onSuccess(res.snapshotId);
-      } else {
-        throw new Error(res?.error || 'Unknown error occurred during GSheet backup');
+
+      if (!res || !res.ok || !res.snapshotId) {
+        throw new Error(res?.error || 'Unknown error occurred during daily GSheet backup');
       }
+
+      // 2. Also save/update the "latest" snapshot reference
+      const resLatest = await sendGSheetAction('saveDataSnapshot', {
+        snapshotType: 'APPSTATE',
+        snapshotName: 'latest',
+        snapshotMode: 'replace',
+        data: { contacts, lists, campaigns, forms, settings }
+      });
+
+      if (!resLatest || !resLatest.ok) {
+        throw new Error(resLatest?.error || 'Failed to update latest snapshot reference');
+      }
+
+      onSuccess(res.snapshotId);
     } catch (err) {
       console.error(err);
       onError(err.message);
@@ -984,7 +1040,9 @@ export function App({ togBtn }) {
         overflow: 'hidden',
         pointerEvents: 'auto',
       }}>
-        {!settings.syncMode ? (
+        {screenLocked ? (
+          <ScreenLockOverlay passcode={settings.passcode} onUnlock={() => setScreenLocked(false)} />
+        ) : !settings.syncMode ? (
           <WelcomeOnboarding settings={settings} onSetup={handleOnboardingSetup} onClose={!isStandalone ? () => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } } : null} />
         ) : (
           <>
@@ -1009,7 +1067,7 @@ export function App({ togBtn }) {
             <div style={{
               width: '32px',
               height: '32px',
-              borderRadius: '10px',
+              borderRadius: '50%',
               background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
               display: 'flex',
               alignItems: 'center',
@@ -1017,7 +1075,9 @@ export function App({ togBtn }) {
               color: '#fff',
               fontSize: '11px',
               fontWeight: 800,
-              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)'
+              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
+              animation: !isStandalone ? 'vcrm-pulse-shadow 4s ease-in-out infinite' : 'none',
+              border: !isStandalone ? '1px solid rgba(255, 255, 255, 0.15)' : 'none'
             }}>
               GV
             </div>
@@ -1158,6 +1218,43 @@ export function App({ togBtn }) {
                 onMouseLeave={e => e.currentTarget.style.opacity = 1}
               >
                 {addBtn.label}
+              </button>
+            )}
+
+            {/* Passcode Lock Button (only if passcode is configured) */}
+            {settings.passcode && (
+              <button
+                onClick={() => setScreenLocked(true)}
+                title="Lock CRM Workspace"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                  marginLeft: '4px'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = '#6366f1';
+                  e.currentTarget.style.color = '#ffffff';
+                  e.currentTarget.style.background = '#6366f1';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.45)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span style={{ fontSize: '15px' }}>🔒</span>
               </button>
             )}
 
@@ -1381,6 +1478,43 @@ export function App({ togBtn }) {
         </div>
       </>
     )}
+
+    {syncing && (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(9, 5, 20, 0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2147483647,
+        color: '#fff',
+        pointerEvents: 'auto'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '4px solid rgba(99, 102, 241, 0.2)',
+          borderTopColor: '#6366f1',
+          borderRadius: '50%',
+          animation: 'vcrm-spin 1s infinite linear',
+          marginBottom: '16px',
+          boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)'
+        }} />
+        <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px' }}>
+          Synchronizing with Google Sheets...
+        </div>
+        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>
+          Please do not close this panel
+        </div>
+      </div>
+    )}
   </div>
 
       {/* ── Modals ── */}
@@ -1444,6 +1578,9 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
   const [gsheetUrl, setGsheetUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [usePasscode, setUsePasscode] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
 
   const handleSelectMode = (mode) => {
     setSelectedMode(mode);
@@ -1455,9 +1592,20 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
       setError('App / Workspace Name is required.');
       return;
     }
+    if (usePasscode) {
+      if (!passcode) {
+        setError('Please enter a passcode.');
+        return;
+      }
+      if (passcode !== confirmPasscode) {
+        setError('Passcodes do not match.');
+        return;
+      }
+    }
+    setError('');
     if (selectedMode === 'local') {
       setLoading(true);
-      await onSetup('local', '', appName.trim());
+      await onSetup('local', '', appName.trim(), usePasscode ? passcode : '');
       setLoading(false);
     } else {
       setStep('gsheet');
@@ -1474,10 +1622,20 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
       setError('Please enter a valid Google Web App URL.');
       return;
     }
+    if (usePasscode) {
+      if (!passcode) {
+        setError('Please enter a passcode.');
+        return;
+      }
+      if (passcode !== confirmPasscode) {
+        setError('Passcodes do not match.');
+        return;
+      }
+    }
     setLoading(true);
     setError('');
     
-    const success = await onSetup('gsheet', gsheetUrl.trim(), appName.trim());
+    const success = await onSetup('gsheet', gsheetUrl.trim(), appName.trim(), usePasscode ? passcode : '');
     setLoading(false);
     if (!success) {
       setError('Connection failed. Please check the Web App URL and try again.');
@@ -1601,6 +1759,99 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
                 onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
               />
             </div>
+
+            <div style={{ marginBottom: '24px', textAlign: 'left', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', margin: 0 }}>
+                  Enable Passcode Lock (Optional)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePasscode(!usePasscode);
+                    setPasscode('');
+                    setConfirmPasscode('');
+                    setError('');
+                  }}
+                  style={{
+                    width: '38px', height: '20px', borderRadius: '10px', background: usePasscode ? '#6366f1' : 'rgba(255,255,255,0.12)',
+                    border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.25s'
+                  }}
+                >
+                  <div style={{
+                    width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: '3px', left: usePasscode ? '21px' : '3px',
+                    transition: 'left 0.25s'
+                  }} />
+                </button>
+              </div>
+              
+              {usePasscode && (
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="password"
+                      value={passcode}
+                      onInput={(e) => setPasscode(e.target.value)}
+                      placeholder="Passcode"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: '#fff',
+                        fontSize: '13px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="password"
+                      value={confirmPasscode}
+                      onInput={(e) => setConfirmPasscode(e.target.value)}
+                      placeholder="Confirm Passcode"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: '#fff',
+                        fontSize: '13px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#f87171',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                marginBottom: '24px',
+                lineHeight: '1.4',
+                textAlign: 'left',
+                width: '100%'
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', marginBottom: '32px' }}>
               {/* Option 1: Local */}
@@ -1789,6 +2040,156 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+    </div>
+  );
+}
+
+export function ScreenLockOverlay({ passcode, onUnlock }) {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+
+  const handleSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (input === passcode) {
+      onUnlock();
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 500);
+      setInput('');
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'linear-gradient(135deg, #090514, #120e2e, #090514)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2147483646,
+      color: '#fff',
+      padding: '20px'
+    }}>
+      <div style={{
+        maxWidth: '400px',
+        width: '100%',
+        background: 'rgba(255, 255, 255, 0.03)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: '24px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '40px 32px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        animation: error ? 'vcrm-shake 0.5s ease' : 'none'
+      }}>
+        {/* Lock Icon */}
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1.5px solid rgba(239, 68, 68, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ef4444',
+          fontSize: '24px',
+          marginBottom: '20px',
+          boxShadow: '0 0 20px rgba(239, 68, 68, 0.15)'
+        }}>
+          🔒
+        </div>
+
+        <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+          Workspace Locked
+        </h2>
+        <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0', lineHeight: '1.4' }}>
+          Please enter your passcode to unlock.
+        </p>
+
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+          <div style={{ position: 'relative', width: '100%', marginBottom: '20px' }}>
+            <input
+              type={showPass ? 'text' : 'password'}
+              value={input}
+              onInput={e => setInput(e.target.value)}
+              placeholder="Enter passcode"
+              autoFocus
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '12px 48px 12px 16px',
+                borderRadius: '10px',
+                border: `1.5px solid ${error ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
+                background: 'rgba(255,255,255,0.04)',
+                color: '#fff',
+                fontSize: '14px',
+                outline: 'none',
+                textAlign: 'center',
+                letterSpacing: showPass ? 'normal' : '4px',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => { if (!error) e.target.style.borderColor = '#6366f1'; }}
+              onBlur={(e) => { if (!error) e.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.4)',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'}
+            >
+              {showPass ? '👁️' : '🙈'}
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '10px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              color: '#fff',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+            onMouseLeave={e => e.currentTarget.style.opacity = 1}
+          >
+            Unlock Workspace
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

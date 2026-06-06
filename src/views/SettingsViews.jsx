@@ -195,6 +195,11 @@ function PresetTextsEditor({ settings, onUpdate }) {
 /* ─── Main settings View (Master-Detail tabbed layout) ─── */
 export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualConfigBackup, contacts, lists, onImport, onDownloadState, onLoadState, onGSheetBackup, onGSheetRestore, onSyncSidebar, onDisconnectAndReset }) {
   const [activeTab, setActiveTab] = useState('customization');
+  const [currentPasscode, setCurrentPasscode] = useState('');
+  const [newPasscode, setNewPasscode] = useState('');
+  const [confirmNewPasscode, setConfirmNewPasscode] = useState('');
+  const [securityError, setSecurityError] = useState('');
+  const [securitySuccess, setSecuritySuccess] = useState('');
 
   const MENU_ITEMS = [
     { id: 'customization', label: '🎨 Customization', desc: 'CRM Statuses & Preset Texts' },
@@ -551,6 +556,136 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
                 >
                   ⟳ Sync Contacts from Sidebar
                 </button>
+              </SettingsCard>
+
+              <SettingsCard title="🔒 Screen Lock & Security" desc="Add passcode protection to lock your CRM workspace screen.">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {settings.passcode ? (
+                    <>
+                      <div style={{ fontSize: '13px', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🛡️</span> Passcode Protection is currently enabled.
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Current Passcode</label>
+                        <input type="password" placeholder="Enter current passcode" value={currentPasscode} onInput={e => setCurrentPasscode(e.target.value)}
+                          style={{ width: '100%', padding: '10px 14px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>New Passcode</label>
+                          <input type="password" placeholder="New passcode" value={newPasscode} onInput={e => setNewPasscode(e.target.value)}
+                            style={{ width: '100%', padding: '10px 14px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Confirm New Passcode</label>
+                          <input type="password" placeholder="Confirm new passcode" value={confirmNewPasscode} onInput={e => setConfirmNewPasscode(e.target.value)}
+                            style={{ width: '100%', padding: '10px 14px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+
+                      {securityError && <div style={{ fontSize: '12.5px', color: '#ef4444', fontWeight: 600 }}>⚠️ {securityError}</div>}
+                      {securitySuccess && <div style={{ fontSize: '12.5px', color: '#166534', fontWeight: 600 }}>✓ {securitySuccess}</div>}
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                        <button
+                          onClick={() => {
+                            setSecurityError('');
+                            setSecuritySuccess('');
+                            if (currentPasscode !== settings.passcode) {
+                              setSecurityError('Current passcode is incorrect.');
+                              return;
+                            }
+                            if (!newPasscode) {
+                              setSecurityError('Please enter a new passcode.');
+                              return;
+                            }
+                            if (newPasscode !== confirmNewPasscode) {
+                              setSecurityError('New passcodes do not match.');
+                              return;
+                            }
+                            onUpdate('passcode', newPasscode);
+                            setCurrentPasscode('');
+                            setNewPasscode('');
+                            setConfirmNewPasscode('');
+                            setSecuritySuccess('Passcode updated successfully.');
+                          }}
+                          style={{ flex: 1, padding: '11px 0', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}
+                        >
+                          Update Passcode
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSecurityError('');
+                            setSecuritySuccess('');
+                            if (currentPasscode !== settings.passcode) {
+                              setSecurityError('Current passcode is incorrect to disable.');
+                              return;
+                            }
+                            onUpdate('passcode', '');
+                            setCurrentPasscode('');
+                            setNewPasscode('');
+                            setConfirmNewPasscode('');
+                            setSecuritySuccess('Passcode protection disabled.');
+                          }}
+                          style={{ padding: '11px 16px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}
+                        >
+                          Disable Lock
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>
+                        CRM passcode protection is currently disabled. Configure a passcode below to enable it.
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Passcode</label>
+                          <input type="password" placeholder="Enter passcode" value={newPasscode} onInput={e => setNewPasscode(e.target.value)}
+                            style={{ width: '100%', padding: '10px 14px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>Confirm Passcode</label>
+                          <input type="password" placeholder="Confirm passcode" value={confirmNewPasscode} onInput={e => setConfirmNewPasscode(e.target.value)}
+                            style={{ width: '100%', padding: '10px 14px', border: `1.5px solid #cbd5e1`, borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+
+                      {securityError && <div style={{ fontSize: '12.5px', color: '#ef4444', fontWeight: 600 }}>⚠️ {securityError}</div>}
+                      {securitySuccess && <div style={{ fontSize: '12.5px', color: '#166534', fontWeight: 600 }}>✓ {securitySuccess}</div>}
+
+                      <button
+                        onClick={() => {
+                          setSecurityError('');
+                          setSecuritySuccess('');
+                          if (!newPasscode) {
+                            setSecurityError('Please enter a passcode.');
+                            return;
+                          }
+                          if (newPasscode !== confirmNewPasscode) {
+                            setSecurityError('Passcodes do not match.');
+                            return;
+                          }
+                          onUpdate('passcode', newPasscode);
+                          setNewPasscode('');
+                          setConfirmNewPasscode('');
+                          setSecuritySuccess('Passcode protection enabled successfully.');
+                        }}
+                        style={{ width: '100%', padding: '11px 0', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
+                      >
+                        Enable Passcode Protection
+                      </button>
+                    </>
+                  )}
+                </div>
               </SettingsCard>
             </>
           )}
