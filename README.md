@@ -1,15 +1,27 @@
 # GV-CRM `v2.0.0`
 
-A lightweight Chrome extension that builds a powerful **CRM** directly into *Google Voice* to manage contacts, build lists, and run automated text messaging campaigns — without ever leaving the tab.
+**GV-CRM** is a lightweight Chrome extension that turns **Google Sheets** into a powerful, interactive CRM built directly on top of **Google Voice**. 
+
+By embedding custom contact profiles, target lists, automated messaging campaigns, and live lead-capture forms directly inside your active Google Voice tab, GV-CRM eliminates the need to constantly switch tabs between your chat sessions and spreadsheets. 
+
+While **Google Sheets is the preferred and recommended database** (allowing cross-device sync, cloud backups, and easy spreadsheet reporting), GV-CRM also supports a fully-functional **offline fallback** that stores 100% of your data locally in your browser.
 
 ---
+
+### 💡 Why GV-CRM?
+* **Zero Tab Switching**: Manage contact history, update lead statuses, and trigger webhooks inline while chat panels are active.
+* **Hybrid Storage Architecture**: Choose between storing 100% of your data locally in your browser (`chrome.storage.local`) or connecting to a Google Sheet via a custom Apps Script backend. **(Google Sheets sync is highly preferred for robust cloud backups, cross-device support, and reporting)**.
+* **Automated Campaigns**: Send personalized bulk SMS/MMS messages to target lists with randomized delay pacing and rate-limit detection to mimic human behavior.
+* **Interactive Forms & Webhooks**: Submit live lead captures to external systems (Zapier, Make, custom endpoints) directly from the Google Voice window.
+
+---
+
 
 ## ✨ Features
 
 ### 📇 CRM Contact & List Management
 - **Rich Contact Profiles** — Add/edit contacts with name, phone, email, tags, status, category, lead source, membership level, and notes.
-- **Custom Categorization** — Organize your contacts dynamically using custom contact statuses, categories, lead sources, and membership levels.
-- **Target Outreach Lists** — Organize contacts into named lists and track list-specific statuses (e.g., *Prospect*, *Confirmed*, *Declined*).
+- **Target Outreach Lists** — Group contacts together into custom lists to organize your segments and track list-specific statuses (e.g., *Prospect*, *Confirmed*, *Declined*).
 - **Filter & Search** — Filter by status, membership, source, category, list status, or tag. Sort contacts, freeze columns, and jump straight into a conversation in one click.
 - **Bulk Actions** — Set status, add to list, remove from list, or bulk delete selected contacts.
 
@@ -19,8 +31,8 @@ A lightweight Chrome extension that builds a powerful **CRM** directly into *Goo
 - **Secure Overlay** — An animated overlay prevents any workspace access or viewing until the correct passcode is entered.
 
 ### 🔌 Storage Modes: Local & Google Sheets Sync
-- **100% Local (Default)** — All data lives in `chrome.storage.local`. Nothing leaves your device, providing a secure, privacy-first offline experience.
-- **Google Sheets Cloud Sync** — Synchronize contacts, lists, and memberships directly to a Google Sheets document via an Apps Script Web App.
+- **Google Sheets Cloud Sync (Highly Recommended)** — Synchronize contacts, lists, and memberships directly to a Google Sheets document via an Apps Script Web App. This is the **preferred storage mode** as it ensures your data is backed up, accessible across different computers, and easily editable directly in Google Sheets.
+- **100% Local Storage** — All data lives in `chrome.storage.local`. Nothing leaves your device, providing a secure, privacy-first offline experience. (Note: Data is confined to your current browser installation).
   - **Auto-Sync** — Optionally push individual contact or list updates to your Google Sheet instantly.
   - **Full Sync** — Manually trigger full bidirectional sync.
   - **Cloud State Snapshots** — Backup your full database or configurations directly to Google Sheets, generating unique Snapshot IDs that can be used to restore your exact workspace state on any machine.
@@ -33,7 +45,10 @@ A lightweight Chrome extension that builds a powerful **CRM** directly into *Goo
 - **Inline Runner** — Access and submit your custom forms directly from the active contact widget.
 
 ### 📣 Campaigns & Google Voice Integration
-- **Automated Text Campaigns** — Send personalized texts to target lists. Support for image attachments (MMS) and real-time delivery HUD.
+- **Mass Outreach Campaigns** — Launch automated dispatches to target lists using one of two modes:
+  - **💬 SMS Broadcast** — Automate sending of personalized outbound text messages (with optional image/MMS attachments) to list members directly through Google Voice.
+  - **📋 Form Sync** — Automate webhook/form submissions in bulk for all contacts in a list, pushing their details to your external API endpoints.
+- **Real-Time HUD** — Monitor dispatch status, queue progress, and execution logs in real time.
 - **Dynamic Personalization** — Personalize messages using template tokens:
   - `{{name}}` — First name of the contact
   - `{{phone}}` — Contact phone number
@@ -43,8 +58,8 @@ A lightweight Chrome extension that builds a powerful **CRM** directly into *Goo
 - **Campaign Controls** — Pause, resume, retry failed contacts only, or duplicate campaigns for new target batches.
 
 ### 🤖 Google Voice Tab Enhancements
-- **Inline Context Widget** — Auto-detects the active caller in your Google Voice chat panel and surfaces their CRM details inline (tags, notes, status, lists, categories, sources, custom forms).
-- **Preset Replies** — Manage quick-insert message templates (supporting token personalization) and drop them into chats with a single click.
+- **Inline Context Widget** — Automatically detects the active contact you are chatting with in Google Voice. Shows their CRM profile inline, and lets you add them to a list, edit details, or run custom forms on the fly.
+- **Preset Replies (Reusable Templates)** — Save frequently used message templates (supporting token personalization) and insert them into chats with a single click to speed up communication.
 - **Draft Stash** — Saves unsent message drafts if you accidentally navigate away, restoring them when you return.
 - **Do Not Contact (DND)** — Flag off-limits contacts to automatically exclude them from campaigns.
 - **Sidebar Synchronizer** — Extract and sync contact details from the active Google Voice conversations roster.
@@ -81,6 +96,20 @@ npm run build
 ```
 
 > Requires **Node.js ≥ 18** and **Google Chrome**.
+
+---
+
+## 📋 Google Sheets Backend Integration
+
+If you choose the recommended **Google Sheets Cloud Sync** mode, you will need to host a Google Apps Script Web App that handles backend database operations. The backend script file is located at [gvcrm-appscript.gs](./gvcrm-appscript.gs).
+
+This Apps Script handles GET/POST requests and interacts with four core spreadsheet tabs:
+* **`Contacts`** — Stores name, phone, email, handle, status, category, lead source, location, and notes.
+* **`ContactLists`** — Stores metadata about custom contact lists/segments.
+* **`ContactListMembers`** — Tracks memberships mapping contacts to lists.
+* **`DataSnapshots`** — Saves configuration snapshots, form templates, and logs.
+
+For detailed request payloads, required spreadsheet column structures, deployment guides, and API endpoint specs, please refer to the [INTEGRATION-GSHEET.md](./INTEGRATION-GSHEET.md) specification file.
 
 ---
 
