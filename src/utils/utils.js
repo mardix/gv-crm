@@ -6,7 +6,33 @@ export const uid = (len = 16) => {
   return s;
 };
 
-export const ini = n => n ? n.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
+export function sanitizeName(name) {
+  return String(name || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u2028-\u202f\u205f-\u206f\u2800\u3000\ufeff\ufff9-\ufffb]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function numericNameKey(name) {
+  const cleaned = sanitizeName(name);
+  const stripped = cleaned.replace(/[\s()+\-.]/g, '');
+  if (!stripped || !/^\d+$/.test(stripped)) return null;
+  let digits = stripped;
+  if (digits.startsWith('1') && digits.length > 10) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+export const ini = n => {
+  const trimmed = sanitizeName(n);
+  if (!trimmed) return '?';
+  if (numericNameKey(trimmed)) {
+    return '#';
+  }
+  return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+};
 
 export function formatPhone(phone) {
   if (!phone) return '';
@@ -31,9 +57,15 @@ export function palFor(status, list) {
 }
 
 export function avatarColor(name) {
-  const p = ['#6366f1', '#8b5cf6', '#ec4899', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#14b8a6'];
+  const numericKey = numericNameKey(name);
+  let colorKey = numericKey ? numericKey.slice(0, 3) || '000' : sanitizeName(name);
+
+  const p = [
+    '#6366f1', '#8b5cf6', '#ec4899', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#14b8a6',
+    '#f97316', '#f43f5e', '#06b6d4', '#84cc16', '#d946ef', '#a855f7', '#475569', '#64748b'
+  ];
   let h = 0;
-  for (const c of (name || '')) h = c.charCodeAt(0) + ((h << 5) - h);
+  for (const c of colorKey) h = c.charCodeAt(0) + ((h << 5) - h);
   return p[Math.abs(h) % p.length];
 }
 

@@ -96,13 +96,17 @@ export function Popup() {
             </button>
           </>
         )}
-        <button class={`disable-btn ${disabled ? 'is-disabled' : ''}`} onClick={handleToggleDisable}>
-          {disabled ? `Enable ${config.appName}` : `Disable ${config.appName}`}
-        </button>
+
+        {isGVPage && (
+          <button class={`disable-btn ${disabled ? 'is-disabled' : ''}`} onClick={handleToggleDisable}>
+            {disabled ? `Enable in Google Voice` : `Disable in Google Voice`}
+          </button>
+        )}
+
       </div>
 
       <div class="divider"></div>
-      <div class="version">{config.appName} v{config.version}</div>
+      <div class="version">©{new Date().getFullYear()} {config.appName}</div>
     </>
   );
 }

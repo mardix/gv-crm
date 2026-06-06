@@ -1,3 +1,5 @@
+import { sanitizeName } from './utils';
+
 const KEYS = ['vcrm_contacts', 'vcrm_lists', 'vcrm_campaigns', 'vcrm_forms', 'vcrm_settings'];
 
 export function loadData(cb) {
@@ -40,7 +42,8 @@ export function loadData(cb) {
         category: '',
         membershipLevel: '',
         ...c
-      }));
+      }))
+      .map(c => ({ ...c, name: sanitizeName(c.name) }));
 
     const rawLists = useLocalBackup ? localBackup.lists : d.vcrm_lists;
     const lists = (rawLists || [])
@@ -67,13 +70,14 @@ export function loadData(cb) {
   });
 }
 
-export function saveData(state) {
+export function saveData(state, writerId) {
   const timestamp = new Date().toISOString();
   const stateWithTime = {
     ...state,
     settings: {
       ...state.settings,
-      savedAt: timestamp
+      savedAt: timestamp,
+      lastWriter: writerId
     }
   };
 

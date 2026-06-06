@@ -134,4 +134,16 @@ chrome.runtime.onMessage.addListener((msg) => {
       setup();
     }
   });
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes.vcrm_disabled) {
+      const isDisabled = !!changes.vcrm_disabled.newValue;
+      if (isDisabled) {
+        teardown();
+      } else {
+        setup();
+      }
+    }
+  });
 })();

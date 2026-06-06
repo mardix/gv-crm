@@ -3,7 +3,7 @@ import { Modal } from './LayoutComponents';
 import { Field } from './LayoutComponents';
 import { Btn } from './Btn';
 import { Input, Textarea, Select } from './FormComponents';
-import { uid, avatarColor, ini } from '../utils/utils';
+import { uid, avatarColor, ini, sanitizeName } from '../utils/utils';
 import { FormRunner } from './FormRunner';
 
 export function ContactModal({ contact, lists, settings, forms, onSave, onDelete, onClose }) {
@@ -18,7 +18,7 @@ export function ContactModal({ contact, lists, settings, forms, onSave, onDelete
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
 
-  const contactName = data.name.trim() || 'New Contact';
+  const contactName = sanitizeName(data.name) || 'New Contact';
   const avatarBg = avatarColor(contactName);
   const initials = ini(contactName);
 

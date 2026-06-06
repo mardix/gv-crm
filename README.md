@@ -25,6 +25,18 @@ While **Google Sheets is the preferred and recommended database** (allowing cros
 - **Filter & Search** — Filter by status, membership, source, category, list status, or tag. Sort contacts, freeze columns, and jump straight into a conversation in one click.
 - **Bulk Actions** — Set status, add to list, remove from list, or bulk delete selected contacts.
 
+### 🔍 Advanced Search Options
+The search bar supports special search operators to quickly find specific groups of contacts:
+- **`##` (Numeric Names)** — Show only contacts whose name is purely numeric or phone-number formatted.
+- **`!#` (Text Names)** — Show only contacts with standard text names (excludes numeric names and contacts with empty names).
+- **`#<digits>` (Phone Prefix Search)** — Show contacts whose phone number starts with the specified digits, ignoring formatting and country code `1` (e.g., `#1800` or `#804` matches those starting prefixes).
+- **`?[field]=[value1],[value2]` (Field Filter)** — Filter contacts by exact field values. Comma-separated values act as an **OR** check (e.g., `?status=active,inactive`).
+- **`?[field]:[operator]=[value]` (Operator Filter)** — Use `eq`, `ne`, `in`, `nin`, `contains`, or `like` for more specific matching (e.g., `?status:ne=inactive`, `?tag:contains=vip`, `?list:nin=Archived`).
+- **`?[has|no]:[field]` (Presence Filter)** — Show contacts who have or do not have the specified field filled (e.g., `?has:email`, `?no:list`).
+  - *Supported fields for field and presence filters:* `name`, `email`, `phone`, `list` (membership), `handle`, `membership` (membership level), `category`, `location`, `status`, `leadsource` (or `source`), `comment` (or `note`), and `tag`.
+  - *Combining multiple filters (AND logic):* You can chain multiple criteria together using a `?` prefix for each segment, with spaces allowed inside values without quotes (e.g., `?status=active ?location=New York ?no:email`).
+- **General Search** — Search by text substring matching across contact names, email addresses, handles, locations, categories, tags, and status fields. For phone numbers, searching a raw sequence of digits (e.g., `8044208965`) will match the contact even if their stored phone number contains formatting or country codes (e.g., `+1 (804) 420-8965`).
+
 ### 🔒 Privacy & Security (Passcode Screen Lock)
 - **Lock Screen Protection** — Configure a passcode lock during onboarding or in Settings to keep your CRM workspace secure.
 - **Instant Locking** — Lock the CRM panel instantly via the lock button (`🔒`) in the navigation bar.

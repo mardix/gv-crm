@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Badge } from '../components/Badge';
-import { palFor, avatarColor, ini } from '../utils/utils';
+import { palFor, avatarColor, ini, numericNameKey, sanitizeName } from '../utils/utils';
+
+function sanitizeSortValue(val) {
+  if (val === undefined || val === null) return '';
+  const str = sanitizeName(val).toLowerCase();
+  const numericKey = numericNameKey(str);
+  if (numericKey) return numericKey;
+  return str;
+}
 
 export function ContactsView({ contacts, lists, settings, search, filterStatus, filterListId, filterListStatus, filterTag, filterMembershipLevel, filterLeadSource, filterCategory, sortCol, sortDir, onSort, onEdit, selectedIds, onSelect, onOpenMessage, freezeCols }) {
   const [page, setPage] = useState(1);
@@ -29,12 +37,196 @@ export function ContactsView({ contacts, lists, settings, search, filterStatus, 
       if (filterListStatus && e.status !== filterListStatus) return false;
     }
     if (search) {
-      const q = search.toLowerCase();
-      return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+      const q = search.trim().toLowerCase();
+      if (q.startsWith('?')) {
+        const getFieldValue = (c, f) => {
+          if (f === 'membership') return c.membershipLevel || '';
+          if (f === 'leadsource' || f === 'source') return c.leadSource || '';
+          if (f === 'comment' || f === 'note') return c.comment || '';
+          return c[f] || '';
+        };
+
+        const segments = q.split('?').map(s => s.trim()).filter(Boolean);
+        const textQueries = [];
+        for (const segment of segments) {
+          let matched = false;
+          if (segment.startsWith('has:') || segment.startsWith('no:')) {
+            const isHas = segment.startsWith('has:');
+            const field = segment.slice(isHas ? 4 : 3).trim();
+            if (['name', 'email', 'phone', 'list', 'handle', 'status', 'membership', 'category', 'location', 'leadsource', 'source', 'comment', 'note', 'tag'].includes(field)) {
+              matched = true;
+              let filled = false;
+              if (field === 'list') {
+                filled = !!(c.lists && c.lists.length > 0);
+              } else if (field === 'tag') {
+                filled = !!(c.tags && c.tags.length > 0);
+              } else {
+                filled = !!getFieldValue(c, field).trim();
+              }
+              if (isHas ? !filled : filled) return false;
+            }
+          } else if (segment.includes('=')) {
+            const idx = segment.indexOf('=');
+            const left = segment.slice(0, idx).trim();
+            const right = segment.slice(idx + 1).trim();
+
+            let field = left;
+            let operator = 'eq';
+            if (left.includes(':')) {
+              const parts = left.split(':');
+              field = parts[0].trim();
+              operator = parts[1].trim();
+            }
+
+            if (['name', 'email', 'phone', 'list', 'handle', 'membership', 'category', 'location', 'status', 'leadsource', 'source', 'comment', 'note', 'tag'].includes(field)) {
+              matched = true;
+              const values = right.split(',').map(v => v.trim()).filter(Boolean);
+
+              if (field === 'list') {
+                const targetListIds = lists
+                  .filter(l => values.includes(String(l.id).toLowerCase()) || values.includes((l.name || '').toLowerCase()))
+                  .map(l => String(l.id));
+
+                const hasListMembership = (c.lists || []).some(m => targetListIds.includes(String(m.listId)));
+
+                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                  if (hasListMembership) return false;
+                } else {
+                  if (!hasListMembership) return false;
+                }
+              } else if (field === 'tag') {
+                const cTags = (c.tags || []).map(t => t.toLowerCase());
+                const matchedTag = values.some(v => {
+                  if (operator === 'like' || operator === 'contains') {
+                    return cTags.some(t => t.includes(v));
+                  }
+                  return cTags.includes(v);
+                });
+                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                  if (matchedTag) return false;
+                } else {
+                  if (!matchedTag) return false;
+                }
+              } else if (field === 'phone') {
+                const cVal = c.phone || '';
+                const cDigits = cVal.replace(/\D/g, '');
+                let normC = cDigits;
+                if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+
+                const matchedPhone = values.some(v => {
+                  const qDigits = v.replace(/\D/g, '');
+                  let normQ = qDigits;
+                  if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+
+                  if (operator === 'like' || operator === 'contains') {
+                    return normC.includes(normQ);
+                  }
+                  return normC === normQ;
+                });
+
+                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                  if (matchedPhone) return false;
+                } else {
+                  if (!matchedPhone) return false;
+                }
+              } else {
+                const cVal = getFieldValue(c, field);
+                const cValLower = cVal.toLowerCase();
+                if (operator === 'in' || operator === 'eq') {
+                  if (!values.includes(cValLower)) return false;
+                } else if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                  if (values.includes(cValLower)) return false;
+                } else if (operator === 'like' || operator === 'contains') {
+                  const matches = values.some(v => cValLower.includes(v));
+                  if (!matches) return false;
+                }
+              }
+            }
+          }
+          if (!matched) {
+            textQueries.push(segment);
+          }
+        }
+        if (textQueries.length > 0) {
+          const textSearch = textQueries.join(' ');
+          return ['name', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(textSearch)) ||
+            (c.tags || []).some(t => t.toLowerCase().includes(textSearch)) ||
+            (() => {
+              const cPhone = c.phone || '';
+              if (cPhone.toLowerCase().includes(textSearch)) return true;
+              const qDigits = textSearch.replace(/\D/g, '');
+              if (qDigits.length >= 3) {
+                const cDigits = cPhone.replace(/\D/g, '');
+                let normQ = qDigits;
+                if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                let normC = cDigits;
+                if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                return normC.includes(normQ);
+              }
+              return false;
+            })();
+        }
+        return true;
+      } else if (q === '##') {
+        return !!numericNameKey(c.name);
+      } else if (q === '!#') {
+        const nameTrimmed = sanitizeName(c.name);
+        if (!nameTrimmed) return false;
+        return !numericNameKey(nameTrimmed);
+      } else if (q.startsWith('#')) {
+        const searchDigits = q.slice(1).replace(/\D/g, '');
+        if (searchDigits.length > 0) {
+          const digits = (c.phone || '').replace(/\D/g, '');
+          let strippedDigits = digits;
+          if (strippedDigits.startsWith('1') && strippedDigits.length > 10) {
+            strippedDigits = strippedDigits.slice(1);
+          }
+          return digits.startsWith(searchDigits) || strippedDigits.startsWith(searchDigits);
+        } else {
+          const queryText = q.slice(1).trim();
+          if (queryText.length > 0) {
+            return ['name', 'email', 'handle', 'status', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(queryText)) ||
+              (c.tags || []).some(t => t.toLowerCase().includes(queryText)) ||
+              (() => {
+                const cPhone = c.phone || '';
+                if (cPhone.toLowerCase().includes(queryText)) return true;
+                const qDigits = queryText.replace(/\D/g, '');
+                if (qDigits.length >= 3) {
+                  const cDigits = cPhone.replace(/\D/g, '');
+                  let normQ = qDigits;
+                  if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                  let normC = cDigits;
+                  if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                  return normC.includes(normQ);
+                }
+                return false;
+              })();
+          }
+          return true;
+        }
+      } else {
+        return ['name', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) ||
+          (c.tags || []).some(t => t.toLowerCase().includes(q)) ||
+          (() => {
+            const cPhone = c.phone || '';
+            if (cPhone.toLowerCase().includes(q)) return true;
+            const qDigits = q.replace(/\D/g, '');
+            if (qDigits.length >= 3) {
+              const cDigits = cPhone.replace(/\D/g, '');
+              let normQ = qDigits;
+              if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+              let normC = cDigits;
+              if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+              return normC.includes(normQ);
+            }
+            return false;
+          })();
+      }
     }
     return true;
   }).sort((a, b) => {
-    const va = (a[sortCol] || '').toString().toLowerCase(), vb = (b[sortCol] || '').toString().toLowerCase();
+    const va = sanitizeSortValue(a[sortCol]);
+    const vb = sanitizeSortValue(b[sortCol]);
     return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
   });
 
@@ -389,13 +581,13 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       <td style={getTdStyle(false, false, 'status')}>{c.status ? <Badge text={c.status} bg={bg} fg={fg} /> : <span style={mutedStyle}>—</span>}</td>
       <td style={getTdStyle(false, false, 'membershipLevel')}>
         {c.membershipLevel ? (
-          <span style={{ 
-            fontSize: '11px', 
-            fontWeight: 700, 
-            background: '#e0f2fe', 
-            color: '#0369a1', 
-            border: '1px solid #bae6fd', 
-            padding: '3px 8px', 
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            background: '#e0f2fe',
+            color: '#0369a1',
+            border: '1px solid #bae6fd',
+            padding: '3px 8px',
             borderRadius: '6px',
             textTransform: 'uppercase',
             display: 'inline-block'
@@ -404,13 +596,13 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       </td>
       <td style={getTdStyle(false, false, 'leadSource')}>
         {c.leadSource ? (
-          <span style={{ 
-            fontSize: '11px', 
-            fontWeight: 700, 
-            background: '#f0fdf4', 
-            color: '#166534', 
-            border: '1px solid #bbf7d0', 
-            padding: '3px 8px', 
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            background: '#f0fdf4',
+            color: '#166534',
+            border: '1px solid #bbf7d0',
+            padding: '3px 8px',
             borderRadius: '6px',
             textTransform: 'uppercase',
             display: 'inline-block'
@@ -419,13 +611,13 @@ function ContactRow({ c, lists, settings, onClick, selected, onToggle, onOpenMes
       </td>
       <td style={getTdStyle(false, false, 'category')}>
         {c.category ? (
-          <span style={{ 
-            fontSize: '11.5px', 
-            fontWeight: 700, 
-            background: '#f5f3ff', 
-            color: '#5b21b6', 
-            border: '1px solid #ddd6fe', 
-            padding: '3px 8px', 
+          <span style={{
+            fontSize: '11.5px',
+            fontWeight: 700,
+            background: '#f5f3ff',
+            color: '#5b21b6',
+            border: '1px solid #ddd6fe',
+            padding: '3px 8px',
             borderRadius: '6px',
             textTransform: 'uppercase',
             display: 'inline-block'

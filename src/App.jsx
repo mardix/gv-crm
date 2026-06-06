@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { loadData, saveData } from './utils/storage';
-import { uid, campaignPhones, formatPhone } from './utils/utils';
+import { uid, campaignPhones, formatPhone, numericNameKey, sanitizeName } from './utils/utils';
 import { ContactsView } from './views/ContactsView';
 import { ListsView, CampaignsView } from './views/ListViews';
 import { SettingsView, IOView } from './views/SettingsViews';
 import { FormsView } from './views/FormsView';
 import { ContactModal } from './components/ContactModal';
 import { ListModal, CampaignModal, SyncSidebarModal, DisconnectModal } from './components/Modals';
+import { Modal, Field } from './components/LayoutComponents';
+import { Input, Textarea, Select } from './components/FormComponents';
+import { Btn } from './components/Btn';
 import { useConversationSync } from './hooks/useConversationSync';
 import { useDraftStash } from './hooks/useDraftStash';
 import { ContextWidget } from './components/ContextWidget';
@@ -14,9 +17,189 @@ import { PresetsWidget } from './components/PresetsWidget';
 import config from './config.json';
 
 const APP_VERSION = config.version.split('.').slice(0, 2).join('.');
+const clientId = Math.random().toString(36).substring(2, 15);
+
+function BulkUpdateModal({ selectedCount, lists, settings, onApply, onDelete, onClose }) {
+  const [location, setLocation] = useState('');
+  const [status, setStatus] = useState('');
+  const [membershipLevel, setMembershipLevel] = useState('');
+  const [leadSource, setLeadSource] = useState('');
+  const [category, setCategory] = useState('');
+  const [tags, setTags] = useState('');
+  const [notes, setNotes] = useState('');
+  const [dndMode, setDndMode] = useState('');
+  const [addListIds, setAddListIds] = useState([]);
+  const [addListStatus, setAddListStatus] = useState(settings.listStatuses?.[0] || '');
+  const [removeListIds, setRemoveListIds] = useState([]);
+
+  const sortedLists = lists.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
+  const activeLists = sortedLists.filter(l => l.status !== 'inactive');
+  const toggleId = (ids, setIds, id) => setIds(ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+
+  const sectionStyle = {
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '18px',
+    background: '#fff',
+    boxShadow: '0 1px 2px rgba(15,23,42,0.03)'
+  };
+  const sectionTitle = {
+    fontSize: '12px',
+    fontWeight: 900,
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: '0.8px',
+    marginBottom: '16px'
+  };
+  const listGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '8px' };
+  const checkRowStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '9px',
+    padding: '9px 10px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    background: '#f8fafc',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#334155',
+    cursor: 'pointer'
+  };
+
+  const handleApply = () => {
+    onApply({
+      location,
+      status,
+      membershipLevel,
+      leadSource,
+      category,
+      tags: tags.split(/[,;]/).map(t => t.trim()).filter(Boolean),
+      notes,
+      dndMode,
+      addListIds,
+      addListStatus,
+      removeListIds
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirm(`Delete ${selectedCount} selected contact${selectedCount !== 1 ? 's' : ''}? This cannot be undone.`)) {
+      onDelete();
+    }
+  };
+
+  const footer = (
+    <>
+      <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      <Btn variant="primary" onClick={handleApply}>Apply Bulk Update</Btn>
+    </>
+  );
+
+  return (
+    <Modal title={`Bulk Update (${selectedCount} selected)`} onClose={onClose} footer={footer}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={sectionStyle}>
+          <div style={sectionTitle}>Contact Info</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '18px' }}>
+            <Field label="Location"><Input value={location} onInput={e => setLocation(e.target.value)} placeholder="Leave blank to keep unchanged" /></Field>
+            <Field label="Contact Status">
+              <Select value={status} onChange={e => setStatus(e.target.value)}>
+                <option value="">No change</option>
+                {(settings.contactStatuses || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '18px' }}>
+            <Field label="Membership Level">
+              <Select value={membershipLevel} onChange={e => setMembershipLevel(e.target.value)}>
+                <option value="">No change</option>
+                {(settings.membershipLevels || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </Field>
+            <Field label="Lead Source">
+              <Select value={leadSource} onChange={e => setLeadSource(e.target.value)}>
+                <option value="">No change</option>
+                {(settings.leadSources || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </Field>
+            <Field label="Category">
+              <Select value={category} onChange={e => setCategory(e.target.value)}>
+                <option value="">No change</option>
+                {(settings.categories || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <Field label="Tag">
+            <Input value={tags} onInput={e => setTags(e.target.value)} placeholder="Add tags, comma-separated" />
+          </Field>
+          <Field label="Notes">
+            <Textarea value={notes} onInput={e => setNotes(e.target.value)} placeholder="Leave blank to keep existing notes. Enter text to replace notes." />
+          </Field>
+          <Field label="Do Not Contact (DND)">
+            <Select value={dndMode} onChange={e => setDndMode(e.target.value)}>
+              <option value="">No change</option>
+              <option value="true">Mark as DND</option>
+              <option value="false">Clear DND</option>
+            </Select>
+          </Field>
+        </div>
+
+        <div style={sectionStyle}>
+          <div style={sectionTitle}>Add To List</div>
+          <Field label="List Status For Added Memberships">
+            <Select value={addListStatus} onChange={e => setAddListStatus(e.target.value)}>
+              {(settings.listStatuses || []).map(s => <option key={s} value={s}>{s}</option>)}
+            </Select>
+          </Field>
+          {activeLists.length ? (
+            <div style={listGridStyle}>
+              {activeLists.map(list => (
+                <label key={list.id} style={checkRowStyle}>
+                  <input type="checkbox" checked={addListIds.includes(list.id)} onChange={() => toggleId(addListIds, setAddListIds, list.id)} style={{ accentColor: '#4f46e5' }} />
+                  <span>{list.name}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>No active lists available.</div>
+          )}
+        </div>
+
+        <div style={sectionStyle}>
+          <div style={sectionTitle}>Remove From List</div>
+          {sortedLists.length ? (
+            <div style={listGridStyle}>
+              {sortedLists.map(list => (
+                <label key={list.id} style={checkRowStyle}>
+                  <input type="checkbox" checked={removeListIds.includes(list.id)} onChange={() => toggleId(removeListIds, setRemoveListIds, list.id)} style={{ accentColor: '#ef4444' }} />
+                  <span>{list.name}{list.status === 'inactive' ? ' (Inactive)' : ''}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>No lists available.</div>
+          )}
+        </div>
+
+        <div style={{ ...sectionStyle, borderColor: '#fecaca', background: '#fff7f7' }}>
+          <div style={{ ...sectionTitle, color: '#b91c1c' }}>Delete Selected Contacts</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ color: '#7f1d1d', fontSize: '13px', lineHeight: 1.5, maxWidth: '360px' }}>
+              Permanently remove {selectedCount} selected contact{selectedCount !== 1 ? 's' : ''} from this CRM.
+            </div>
+            <Btn variant="danger" onClick={handleDelete} style={{ marginRight: 0 }}>
+              Delete Selected Contacts
+            </Btn>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 export function App({ togBtn }) {
   const isStandalone = window.location.protocol === 'chrome-extension:' || !window.location.host.includes('voice.google.com');
+  const isSyncingFromStorage = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(isStandalone);
   const [view, setView] = useState('contacts');
@@ -49,7 +232,7 @@ export function App({ togBtn }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
-  const [bulkSelCollapsed, setBulkSelCollapsed] = useState(false);
+  const [bulkUpdateModal, setBulkUpdateModal] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
   const [screenLocked, setScreenLocked] = useState(false);
@@ -89,6 +272,8 @@ export function App({ togBtn }) {
   const [formModal, setFormModal] = useState(null);
   const [syncModal, setSyncModal] = useState(false);
   const [disconnectModal, setDisconnectModal] = useState(false);
+  const [showSearchTip, setShowSearchTip] = useState(false);
+  const [searchTipSticky, setSearchTipSticky] = useState(false);
 
   const activeContact = useConversationSync();
   useDraftStash();
@@ -543,19 +728,59 @@ export function App({ togBtn }) {
     };
     chrome.runtime.onMessage.addListener(msgListener);
 
+    const storageListener = (changes, areaName) => {
+      if (areaName !== 'local') return;
+
+      const settingsChange = changes.vcrm_settings;
+      if (settingsChange && settingsChange.newValue) {
+        const newSettings = settingsChange.newValue;
+        if (newSettings.lastWriter === clientId) {
+          return;
+        }
+
+        // Setting syncing ref to prevent saving again
+        isSyncingFromStorage.current = true;
+
+        if (changes.vcrm_contacts) {
+          setContacts(changes.vcrm_contacts.newValue || []);
+        }
+        if (changes.vcrm_lists) {
+          setLists(changes.vcrm_lists.newValue || []);
+        }
+        if (changes.vcrm_campaigns) {
+          setCampaigns(changes.vcrm_campaigns.newValue || []);
+        }
+        if (changes.vcrm_forms) {
+          setForms(changes.vcrm_forms.newValue || []);
+        }
+
+        const loadedSettings = { ...newSettings };
+        if (!loadedSettings.syncMode) {
+          loadedSettings.syncMode = loadedSettings.gsheetUrl ? 'gsheet' : undefined;
+        }
+        setSettings(loadedSettings);
+      }
+    };
+    chrome.storage.onChanged.addListener(storageListener);
+
     return () => {
       if (rootEl) {
         rootEl.removeEventListener('vcrm-open', handlerOpen);
         rootEl.removeEventListener('vcrm-close', handlerClose);
       }
       chrome.runtime.onMessage.removeListener(msgListener);
+      chrome.storage.onChanged.removeListener(storageListener);
     };
   }, []);
 
   useEffect(() => {
     if (loaded) {
+      if (isSyncingFromStorage.current) {
+        isSyncingFromStorage.current = false;
+        return;
+      }
       const timer = setTimeout(() => {
-        saveData({ contacts, lists, campaigns, forms, settings });
+        saveData({ contacts, lists, campaigns, forms, settings }, clientId);
       }, 150);
       return () => clearTimeout(timer);
     }
@@ -580,10 +805,10 @@ export function App({ togBtn }) {
       const rawPhone = String(row.phone || Object.values(row)[0] || '').trim();
       const phoneDigits = rawPhone.replace(/\D/g, '');
       const email = String(row.email || '').trim().toLowerCase();
-      let name = String(row.name || '').trim();
+      let name = sanitizeName(row.name || '');
 
       if (!phoneDigits && !email) return; // Skip entirely empty rows
-      if (!name) name = rawPhone;
+      if (!name) name = sanitizeName(rawPhone);
 
       // Check if contact already exists
       const existingIdx = newContacts.findIndex(c =>
@@ -724,6 +949,47 @@ export function App({ togBtn }) {
     setCampaigns(cs => [fresh, ...cs]);
     localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
     setView('campaigns');
+  }
+
+  function handleBulkApply(update) {
+    const selectedSet = new Set(selectedIds);
+    const addListSet = new Set(update.addListIds || []);
+    const removeListSet = new Set(update.removeListIds || []);
+
+    setContacts(cs => cs.map(c => {
+      if (!selectedSet.has(c.id)) return c;
+
+      const next = { ...c };
+      if (update.location.trim()) next.location = update.location.trim();
+      if (update.status) next.status = update.status;
+      if (update.membershipLevel) next.membershipLevel = update.membershipLevel;
+      if (update.leadSource) next.leadSource = update.leadSource;
+      if (update.category) next.category = update.category;
+      if (update.notes.trim()) next.comment = update.notes.trim();
+      if (update.dndMode === 'true') next.dnd = true;
+      if (update.dndMode === 'false') next.dnd = false;
+      if (update.tags.length) {
+        next.tags = [...new Set([...(next.tags || []), ...update.tags])];
+      }
+
+      let memberships = (next.lists || []).filter(m => !removeListSet.has(m.listId));
+      addListSet.forEach(listId => {
+        memberships = memberships.filter(m => m.listId !== listId);
+        memberships.push({ listId, status: update.addListStatus || settings.listStatuses?.[0] || '' });
+      });
+      next.lists = memberships;
+
+      return next;
+    }));
+
+    setBulkUpdateModal(false);
+  }
+
+  function handleBulkDelete() {
+    const selectedSet = new Set(selectedIds);
+    setContacts(cs => cs.filter(c => !selectedSet.has(c.id)));
+    setSelectedIds([]);
+    setBulkUpdateModal(false);
   }
 
   const addBtn =
@@ -1284,8 +1550,66 @@ export function App({ togBtn }) {
             {/* ── Filter bar ── */}
             {(['contacts', 'lists'].includes(view)) && (
               <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '140px', maxWidth: '260px' }}>
-                  <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 12px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
+                <div style={{ position: 'relative', flex: 1, minWidth: '140px', maxWidth: '260px', display: 'flex', alignItems: 'center' }}>
+                  <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 32px 6px 12px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
+                  {view === 'contacts' && (
+                    <button 
+                      type="button"
+                      onMouseEnter={e => { e.currentTarget.style.background = '#cbd5e1'; e.currentTarget.style.color = '#0f172a'; setShowSearchTip(true); }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; if (!searchTipSticky) setShowSearchTip(false); }}
+                      onClick={(e) => { e.stopPropagation(); setSearchTipSticky(s => !s); setShowSearchTip(s => !s); }}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: '#e2e8f0',
+                        color: '#64748b',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'help',
+                        userSelect: 'none',
+                        padding: 0,
+                        transition: 'background 0.15s, color 0.15s'
+                      }}
+                      title="Search Tips"
+                    >
+                      ?
+                      {showSearchTip && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '26px',
+                          right: '-10px',
+                          width: '240px',
+                          background: '#1e293b',
+                          color: '#f8fafc',
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                          fontSize: '11.5px',
+                          fontWeight: 500,
+                          lineHeight: '1.5',
+                          zIndex: 100,
+                          pointerEvents: 'none',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ fontWeight: 800, color: '#a5b4fc', marginBottom: '6px', fontSize: '12px' }}>🔍 Advanced Search Tips:</div>
+                           • Type <strong style={{ color: '#fff', fontFamily: 'monospace' }}>##</strong> to show only numeric names.<br/>
+                          • Type <strong style={{ color: '#fff', fontFamily: 'monospace' }}>!#</strong> to show contacts with text names (excludes numbers & empty).<br/>
+                          • Type <strong style={{ color: '#fff', fontFamily: 'monospace' }}>#1800</strong> to search starting prefix digits (ignores country codes & formatting).<br/>
+                          • Type <strong style={{ color: '#fff', fontFamily: 'monospace' }}>?[field]=[value]</strong> or <strong style={{ color: '#fff', fontFamily: 'monospace' }}>?[has|no]:[field]</strong> to filter fields (e.g. <span style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>?status=active ?location=Miami ?has:email</span>).
+                          <br/>Operators: <span style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>eq, ne, in, nin, contains, like</span> (e.g. <span style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>?status:ne=inactive ?tag:contains=vip</span>).
+                          <br/>Fields: <span style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>name, email, phone, list, handle, membership, category, location, status, leadsource/source, comment/note, tag</span>.
+                        </div>
+                      )}
+                    </button>
+                  )}
                 </div>
                 {view === 'contacts' && (() => {
                   const filteredCount = contacts.filter(c => {
@@ -1300,8 +1624,191 @@ export function App({ togBtn }) {
                       if (filterListStatus && e.status !== filterListStatus) return false;
                     }
                     if (search) {
-                      const q = search.toLowerCase();
-                      return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+                      const q = search.trim().toLowerCase();
+                      if (q.startsWith('?')) {
+                        const getFieldValue = (c, f) => {
+                          if (f === 'membership') return c.membershipLevel || '';
+                          if (f === 'leadsource' || f === 'source') return c.leadSource || '';
+                          if (f === 'comment' || f === 'note') return c.comment || '';
+                          return c[f] || '';
+                        };
+                        
+                        const segments = q.split('?').map(s => s.trim()).filter(Boolean);
+                        const textQueries = [];
+                        for (const segment of segments) {
+                          let matched = false;
+                          if (segment.startsWith('has:') || segment.startsWith('no:')) {
+                            const isHas = segment.startsWith('has:');
+                            const field = segment.slice(isHas ? 4 : 3).trim();
+                            if (['name', 'email', 'phone', 'list', 'handle', 'membership', 'category', 'location', 'leadsource', 'source', 'comment', 'note', 'tag'].includes(field)) {
+                              matched = true;
+                              let filled = false;
+                              if (field === 'list') {
+                                filled = !!(c.lists && c.lists.length > 0);
+                              } else if (field === 'tag') {
+                                filled = !!(c.tags && c.tags.length > 0);
+                              } else {
+                                filled = !!getFieldValue(c, field).trim();
+                              }
+                              if (isHas ? !filled : filled) return false;
+                            }
+                          } else if (segment.includes('=')) {
+                            const idx = segment.indexOf('=');
+                            const left = segment.slice(0, idx).trim();
+                            const right = segment.slice(idx + 1).trim();
+                            
+                            let field = left;
+                            let operator = 'eq';
+                            if (left.includes(':')) {
+                              const parts = left.split(':');
+                              field = parts[0].trim();
+                              operator = parts[1].trim();
+                            }
+                            
+                            if (['name', 'email', 'phone', 'list', 'handle', 'membership', 'category', 'location', 'status', 'leadsource', 'source', 'comment', 'note', 'tag'].includes(field)) {
+                              matched = true;
+                              const values = right.split(',').map(v => v.trim()).filter(Boolean);
+                              
+                              if (field === 'list') {
+                                const targetListIds = lists
+                                  .filter(l => values.includes(String(l.id).toLowerCase()) || values.includes((l.name || '').toLowerCase()))
+                                  .map(l => String(l.id));
+                                
+                                const hasListMembership = (c.lists || []).some(m => targetListIds.includes(String(m.listId)));
+                                
+                                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                                  if (hasListMembership) return false;
+                                } else {
+                                  if (!hasListMembership) return false;
+                                }
+                              } else if (field === 'tag') {
+                                const cTags = (c.tags || []).map(t => t.toLowerCase());
+                                const matchedTag = values.some(v => {
+                                  if (operator === 'like' || operator === 'contains') {
+                                    return cTags.some(t => t.includes(v));
+                                  }
+                                  return cTags.includes(v);
+                                });
+                                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                                  if (matchedTag) return false;
+                                } else {
+                                  if (!matchedTag) return false;
+                                }
+                              } else if (field === 'phone') {
+                                const cVal = c.phone || '';
+                                const cDigits = cVal.replace(/\D/g, '');
+                                let normC = cDigits;
+                                if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                                
+                                const matchedPhone = values.some(v => {
+                                  const qDigits = v.replace(/\D/g, '');
+                                  let normQ = qDigits;
+                                  if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                                  
+                                  if (operator === 'like' || operator === 'contains') {
+                                    return normC.includes(normQ);
+                                  }
+                                  return normC === normQ;
+                                });
+                                
+                                if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                                  if (matchedPhone) return false;
+                                } else {
+                                  if (!matchedPhone) return false;
+                                }
+                              } else {
+                                const cVal = getFieldValue(c, field);
+                                const cValLower = cVal.toLowerCase();
+                                if (operator === 'in' || operator === 'eq') {
+                                  if (!values.includes(cValLower)) return false;
+                                } else if (operator === 'nin' || operator === 'notin' || operator === 'ne') {
+                                  if (values.includes(cValLower)) return false;
+                                } else if (operator === 'like' || operator === 'contains') {
+                                  const matches = values.some(v => cValLower.includes(v));
+                                  if (!matches) return false;
+                                }
+                              }
+                            }
+                          }
+                          if (!matched) {
+                            textQueries.push(segment);
+                          }
+                        }
+                        if (textQueries.length > 0) {
+                          const textSearch = textQueries.join(' ');
+                          return ['name', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(textSearch)) || 
+                                 (c.tags || []).some(t => t.toLowerCase().includes(textSearch)) ||
+                                 (() => {
+                                   const cPhone = c.phone || '';
+                                   if (cPhone.toLowerCase().includes(textSearch)) return true;
+                                   const qDigits = textSearch.replace(/\D/g, '');
+                                   if (qDigits.length >= 3) {
+                                     const cDigits = cPhone.replace(/\D/g, '');
+                                     let normQ = qDigits;
+                                     if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                                     let normC = cDigits;
+                                     if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                                     return normC.includes(normQ);
+                                   }
+                                   return false;
+                                 })();
+                        }
+                        return true;
+                      } else if (q === '##') {
+                        return !!numericNameKey(c.name);
+                      } else if (q === '!#') {
+                        const nameTrimmed = sanitizeName(c.name);
+                        if (!nameTrimmed) return false;
+                        return !numericNameKey(nameTrimmed);
+                      } else if (q.startsWith('#')) {
+                        const searchDigits = q.slice(1).replace(/\D/g, '');
+                        if (searchDigits.length > 0) {
+                          const digits = (c.phone || '').replace(/\D/g, '');
+                          let strippedDigits = digits;
+                          if (strippedDigits.startsWith('1') && strippedDigits.length > 10) {
+                            strippedDigits = strippedDigits.slice(1);
+                          }
+                          return digits.startsWith(searchDigits) || strippedDigits.startsWith(searchDigits);
+                        } else {
+                          const queryText = q.slice(1).trim();
+                          if (queryText.length > 0) {
+                            return ['name', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(queryText)) || 
+                                   (c.tags || []).some(t => t.toLowerCase().includes(queryText)) ||
+                                   (() => {
+                                     const cPhone = c.phone || '';
+                                     if (cPhone.toLowerCase().includes(queryText)) return true;
+                                     const qDigits = queryText.replace(/\D/g, '');
+                                     if (qDigits.length >= 3) {
+                                       const cDigits = cPhone.replace(/\D/g, '');
+                                       let normQ = qDigits;
+                                       if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                                       let normC = cDigits;
+                                       if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                                       return normC.includes(normQ);
+                                     }
+                                     return false;
+                                   })();
+                          }
+                          return true;
+                        }
+                      } else {
+                        return ['name', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || 
+                               (c.tags || []).some(t => t.toLowerCase().includes(q)) ||
+                               (() => {
+                                 const cPhone = c.phone || '';
+                                 if (cPhone.toLowerCase().includes(q)) return true;
+                                 const qDigits = q.replace(/\D/g, '');
+                                 if (qDigits.length >= 3) {
+                                   const cDigits = cPhone.replace(/\D/g, '');
+                                   let normQ = qDigits;
+                                   if (normQ.startsWith('1') && normQ.length > 10) normQ = normQ.slice(1);
+                                   let normC = cDigits;
+                                   if (normC.startsWith('1') && normC.length > 10) normC = normC.slice(1);
+                                   return normC.includes(normQ);
+                                 }
+                                 return false;
+                               })();
+                      }
                     }
                     return true;
                   }).length;
@@ -1368,73 +1875,26 @@ export function App({ togBtn }) {
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
               {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} filterMembershipLevel={filterMembershipLevel} filterLeadSource={filterLeadSource} filterCategory={filterCategory} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
 
-              {/* Bulk Actions Bar */}
+              {/* Bulk Actions Launcher */}
               {view === 'contacts' && selectedIds.length > 0 && (
                 <div style={{
                   position: 'absolute', bottom: '20px', left: '20px',
-                  background: '#0f172a', color: '#fff', padding: '10px 20px', borderRadius: '12px',
-                  display: 'flex', flexDirection: bulkSelCollapsed ? 'row' : 'column', alignItems: bulkSelCollapsed ? 'center' : 'flex-start', gap: '14px',
+                  background: '#0f172a', color: '#fff', padding: '10px 12px 10px 16px', borderRadius: '12px',
+                  display: 'flex', alignItems: 'center', gap: '12px',
                   boxShadow: '0 20px 50px rgba(15,23,42,.4)',
                   zIndex: 100, border: '1px solid rgba(255,255,255,.1)',
                   width: 'max-content', maxWidth: 'calc(100% - 40px)'
                 }}>
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', cursor: 'pointer' }}
-                    onClick={() => setBulkSelCollapsed(!bulkSelCollapsed)}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>{selectedIds.length} selected</div>
-                    <span style={{ fontSize: '16px', color: '#94a3b8', lineHeight: 1, display: 'inline-block', transition: 'transform 0.2s', transform: bulkSelCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-
-                    {bulkSelCollapsed && (
-                      <div style={{ marginLeft: 'auto' }}>
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedIds([]); }} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px', padding: '0 5px' }}>Clear</button>
-                      </div>
-                    )}
+                  <div style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {selectedIds.length} selected
                   </div>
-
-                  {!bulkSelCollapsed && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', width: '100%' }}>
-                      {/* Set Status */}
-                      <select onChange={e => {
-                        const s = e.target.value; if (!s) return;
-                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, status: s } : c));
-                        e.target.value = '';
-                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                        <option value="">Set Status…</option>
-                        {settings.contactStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-
-                      {/* Add to List */}
-                      <select onChange={e => {
-                        const lid = e.target.value; if (!lid) return;
-                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: [...(c.lists || []).filter(x => x.listId !== lid), { listId: lid, status: settings.listStatuses[0] || '' }] } : c));
-                        e.target.value = '';
-                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                        <option value="">Add to List…</option>
-                        {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                      </select>
-
-                      {/* Remove from List */}
-                      <select onChange={e => {
-                        const lid = e.target.value; if (!lid) return;
-                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: (c.lists || []).filter(x => x.listId !== lid) } : c));
-                        e.target.value = '';
-                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                        <option value="">Remove from List…</option>
-                        {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                      </select>
-
-                      <button onClick={() => {
-                        if (confirm(`Delete ${selectedIds.length} contacts?`)) {
-                          setContacts(cs => cs.filter(c => !selectedIds.includes(c.id)));
-                          setSelectedIds([]);
-                        }
-                      }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Delete</button>
-
-                      <div style={{ flex: 1 }}></div>
-                      <button onClick={() => setSelectedIds([])} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px' }}>Clear</button>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setBulkUpdateModal(true)}
+                    style={{ background: '#fff', color: '#0f172a', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    Bulk Update
+                  </button>
+                  <button onClick={() => setSelectedIds([])} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.65)', cursor: 'pointer', fontSize: '12px', padding: '4px 6px' }}>Clear</button>
                 </div>
               )}
               {view === 'lists' && <ListsView lists={lists} contacts={contacts} settings={settings} search={search} onEdit={l => setListModal(l)} onDelete={id => {
@@ -1507,6 +1967,7 @@ export function App({ togBtn }) {
         contact={contactModal === 'new' ? null : contactModal}
         lists={lists} settings={settings} forms={forms}
         onSave={c => {
+          c.name = sanitizeName(c.name);
           c.phone = formatPhone(c.phone);
           setContacts(cs => { const i = cs.findIndex(x => x.id === c.id); return i >= 0 ? cs.map((x, j) => j === i ? c : x) : [c, ...cs]; });
           setContactModal(null);
@@ -1519,6 +1980,17 @@ export function App({ togBtn }) {
         }}
         onClose={() => setContactModal(null)}
       />}
+
+      {bulkUpdateModal && selectedIds.length > 0 && (
+        <BulkUpdateModal
+          selectedCount={selectedIds.length}
+          lists={lists}
+          settings={settings}
+          onApply={handleBulkApply}
+          onDelete={handleBulkDelete}
+          onClose={() => setBulkUpdateModal(false)}
+        />
+      )}
 
       {listModal && <ListModal
         list={listModal === 'new' ? null : listModal}
@@ -1542,13 +2014,15 @@ export function App({ togBtn }) {
       {disconnectModal && <DisconnectModal settings={settings} onConfirm={handleDisconnectAndReset} onClose={() => setDisconnectModal(false)} />}
 
       {/* Context Widget (Phase 3) */}
-      <ContextWidget
-        activeContact={activeContact}
-        contacts={contacts} lists={lists} forms={forms} settings={settings}
-        onAdd={handleAddFromContext} onEdit={c => setContactModal(c)}
-      />
+      {!screenLocked && settings.syncMode && (
+        <ContextWidget
+          activeContact={activeContact}
+          contacts={contacts} lists={lists} forms={forms} settings={settings}
+          onAdd={handleAddFromContext} onEdit={c => setContactModal(c)}
+        />
+      )}
 
-      {!open && (
+      {!screenLocked && settings.syncMode && !open && (
         <PresetsWidget
           activeContact={activeContact}
           settings={settings}

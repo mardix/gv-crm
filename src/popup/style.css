@@ -118,7 +118,7 @@ body {
   background: transparent;
   border: none;
   border-radius: 8px;
-  color: #ef4444;
+  color: #c51515;
   font-family: 'Inter', sans-serif;
   font-size: 12.5px;
   font-weight: 600;
@@ -127,7 +127,7 @@ body {
 }
 .disable-btn:hover { background: #fef2f2; }
 .disable-btn.is-disabled {
-  color: #10b981;
+  color: #0d865e;
 }
 .disable-btn.is-disabled:hover { background: #ecfdf5; }
 
