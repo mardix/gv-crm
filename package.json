@@ -1,5 +1,5 @@
 {
-  "name": "gv-crm",
+  "name": "gsheet-crm",
   "version": "2.0.0",
   "main": "index.js",
   "scripts": {
@@ -7,7 +7,7 @@
     "build": "vite build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["Google Voice", "CRM", "Contact Manager"],
+  "keywords": ["Google Voice", "Google Sheet", "CRM", "Contact Manager"],
   "author": "https://github.com/mardix",
   "license": "MIT",
   "description": "",

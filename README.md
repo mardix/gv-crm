@@ -107,7 +107,7 @@ npm run build
 # 3. Load the dist/ folder into Chrome (same steps as Option A)
 ```
 
-> Requires **Node.js ≥ 18** and **Google Chrome**.
+> Requires **Node.js ≥ 22** and **Google Chrome**.
 
 ---
 
