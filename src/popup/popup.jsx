@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'preact/hooks';
+import config from '../config.json';
 
 export function Popup() {
-  const [stats, setStats] = useState({ total: 0, active: 0, lists: 0 });
   const [disabled, setDisabled] = useState(false);
   const [hideRightSidebar, setHideRightSidebar] = useState(false);
   const [isGVPage, setIsGVPage] = useState(false);
+  const [appName, setAppName] = useState('');
 
   useEffect(() => {
-    chrome.storage.local.get(['vcrm_contacts', 'vcrm_lists', 'vcrm_disabled', 'vcrm_settings'], (data) => {
-      const contacts = data.vcrm_contacts || [];
-      const lists = data.vcrm_lists || [];
-      const active = contacts.filter(c => c.status === 'Active' || c.status === 'Customer').length;
-      setStats({ total: contacts.length, active, lists: lists.length });
+    chrome.storage.local.get(['vcrm_disabled', 'vcrm_settings'], (data) => {
       setDisabled(!!data.vcrm_disabled);
       setHideRightSidebar(!!(data.vcrm_settings?.hideRightSidebar));
+      setAppName(data.vcrm_settings?.appName || '');
     });
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -75,21 +73,22 @@ export function Popup() {
       <div class="logo">
         <div class="logo-mark">✦</div>
         <div>
-          <div class="logo-text">GV-CRM</div>
-          <div class="logo-sub">V1.0.0</div>
+          <div class="logo-text">{config.appName}</div>
+          <div class="logo-sub">v{config.version}</div>
         </div>
       </div>
 
-      <div class="stats" id="stats">
-        <div class="stat"><div class="stat-num">{stats.total}</div><div class="stat-lbl">Contacts</div></div>
-        <div class="stat"><div class="stat-num">{stats.active}</div><div class="stat-lbl">Active</div></div>
-        <div class="stat"><div class="stat-num">{stats.lists}</div><div class="stat-lbl">Lists</div></div>
-      </div>
+      {appName && (
+        <div class="workspace-card">
+          <div class="workspace-label">Workspace</div>
+          <div class="workspace-value">{appName}</div>
+        </div>
+      )}
 
       <div class="btn-group">
         <button class="open-btn" style={{ background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#fff', border: 'none', marginBottom: '4px' }} onClick={handleOpenStandalone}>Launch Standalone CRM ↗</button>
         {!isGVPage && <button class="open-btn" onClick={handleOpen}>Open Google Voice →</button>}
-        {!disabled && (
+        {!disabled && isGVPage && (
           <>
             <button class="toggle-btn" onClick={handleToggleUI}>Toggle CRM Panel</button>
             <button class="toggle-btn" onClick={handleToggleSidebar}>
@@ -98,12 +97,12 @@ export function Popup() {
           </>
         )}
         <button class={`disable-btn ${disabled ? 'is-disabled' : ''}`} onClick={handleToggleDisable}>
-          {disabled ? 'Enable GV-CRM' : 'Disable GV-CRM'}
+          {disabled ? `Enable ${config.appName}` : `Disable ${config.appName}`}
         </button>
       </div>
 
       <div class="divider"></div>
-      <div class="version">GV-CRM v1.0.0</div>
+      <div class="version">{config.appName} v{config.version}</div>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import config from '../config.json';
 import { Badge } from './Badge';
 import { Btn } from './Btn';
 import { palFor, avatarColor, ini } from '../utils/utils';
@@ -242,7 +243,7 @@ export function ContextWidget({ activeContact, contacts, lists, forms, settings,
             ) : (
               <>
                 <div style={{ fontSize: '12.5px', color: '#64748b', lineHeight: '1.5' }}>
-                  This contact is not in your GV-CRM. Add them to start tracking status and notes.
+                  This contact is not in your {config.appName}. Add them to start tracking status and notes.
                 </div>
                 <Btn variant="primary" onClick={() => onAdd(activeContact)} style={{ width: '100%', height: '40px', fontWeight: 700 }}>+ Add New Contact</Btn>
               </>

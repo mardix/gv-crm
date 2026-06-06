@@ -1,14 +1,14 @@
-# GV-CRM `v2.0.0`
+# GSHEET CRM `v2.0.0`
 
-**GV-CRM** is a lightweight Chrome extension that turns **Google Sheets** into a powerful, interactive CRM built directly on top of **Google Voice**. 
+**GSHEET CRM** is a lightweight Chrome extension that turns **Google Sheets** into a powerful, interactive CRM built directly on top of **Google Voice**. 
 
-By embedding custom contact profiles, target lists, automated messaging campaigns, and live lead-capture forms directly inside your active Google Voice tab, GV-CRM eliminates the need to constantly switch tabs between your chat sessions and spreadsheets. 
+By embedding custom contact profiles, target lists, automated messaging campaigns, and live lead-capture forms directly inside your active Google Voice tab, GSHEET CRM eliminates the need to constantly switch tabs between your chat sessions and spreadsheets. 
 
-While **Google Sheets is the preferred and recommended database** (allowing cross-device sync, cloud backups, and easy spreadsheet reporting), GV-CRM also supports a fully-functional **offline fallback** that stores 100% of your data locally in your browser.
+While **Google Sheets is the preferred and recommended database** (allowing cross-device sync, cloud backups, and easy spreadsheet reporting), GSHEET CRM also supports a fully-functional **offline fallback** that stores 100% of your data locally in your browser.
 
 ---
 
-### 💡 Why GV-CRM?
+### 💡 Why GSHEET CRM?
 * **Zero Tab Switching**: Manage contact history, update lead statuses, and trigger webhooks inline while chat panels are active.
 * **Hybrid Storage Architecture**: Choose between storing 100% of your data locally in your browser (`chrome.storage.local`) or connecting to a Google Sheet via a custom Apps Script backend. **(Google Sheets sync is highly preferred for robust cloud backups, cross-device support, and reporting)**.
 * **Automated Campaigns**: Send personalized bulk SMS/MMS messages to target lists with randomized delay pacing and rate-limit detection to mimic human behavior.
@@ -81,7 +81,7 @@ While **Google Sheets is the preferred and recommended database** (allowing cros
 2. Enable **Developer mode** (toggle in the top-right)
 3. Click **Load unpacked**
 4. Select the **`dist/`** folder from this repository
-5. Go to [voice.google.com](https://voice.google.com) — the **GV-CRM** widget will appear on the screen
+5. Go to [voice.google.com](https://voice.google.com) — the **GSHEET CRM** widget will appear on the screen
 
 ### Option B — Build from source
 
@@ -115,7 +115,7 @@ For detailed request payloads, required spreadsheet column structures, deploymen
 
 ## 📖 Quick Start
 
-1. Click the **GV-CRM** tab on the right side of Google Voice.
+1. Click the **GSHEET CRM** tab on the right side of Google Voice.
 2. Complete onboarding by choosing **Local** or **Google Sheets Sync** and setting an optional **Passcode**.
 3. Go to **Settings** → **Customization** to configure your statuses, categories, sources, and preset replies.
 4. Go to **Contacts** → click **+ Add Contact** to add your first contact (or import them under **Data & Backup**).
@@ -129,7 +129,7 @@ For detailed request payloads, required spreadsheet column structures, deploymen
 | Settings Tab | Features |
 |---|---|
 | **🎨 Customization** | Edit Contact/List statuses, Membership levels, Lead sources, Categories, and Preset Texts. |
-| **🔌 Storage & Sync** | Toggle Local/GSheet modes, configure Apps Script URL, enable auto-sync, or reset database. |
+| **🔌 Storage & Sync** | Toggle Local/GSHEET modes, configure Apps Script URL, enable auto-sync, or reset database. |
 | **💾 Data & Backup** | Trigger local/cloud state backups & restores, download CSV/JSON lists, and import files or raw text. |
 | **⚙ System Settings** | Toggle layout options (e.g. Hide GV Sidebar) and customize Campaign pacing min/max delays. |
 

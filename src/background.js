@@ -271,11 +271,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         catch (e) { return { ok: false, error: 'Invalid JSON response from server', text }; }
       }))
       .then(json => {
-        console.log('GSheet Proxy Response:', json);
+        console.log('GSHEET Proxy Response:', json);
         sendResponse(json);
       })
       .catch(e => {
-        console.error('GSheet Proxy Error:', e);
+        console.error('GSHEET Proxy Error:', e);
         sendResponse({ ok: false, error: e.message });
       });
     return true;

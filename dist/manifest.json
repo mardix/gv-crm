@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "GV-CRM",
+  "name": "GSHEET-CRM",
   "version": "2.0.0",
   "description": "A lightweight Contact Manager panel inside Google Voice.",
   "permissions": [
@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.jsx-loader-DlJ6UZUH.js"
+        "assets/main.jsx-loader-Dn7yGrvZ.js"
       ],
       "matches": [
         "https://voice.google.com/*"
@@ -30,7 +30,7 @@
   },
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "GV-CRM",
+    "default_title": "GSHEET-CRM",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -50,9 +50,9 @@
       ],
       "resources": [
         "icons/*",
-        "assets/jsxRuntime.module-B0e0SKti.js",
-        "assets/styles-DSdOQwPP.js",
-        "assets/main.jsx-B7pbYI-j.js"
+        "assets/jsxRuntime.module-D3zxQMLj.js",
+        "assets/styles-DduMqBU-.js",
+        "assets/main.jsx-Dx0fYD0m.js"
       ],
       "use_dynamic_url": false
     }

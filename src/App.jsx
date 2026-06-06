@@ -6,11 +6,15 @@ import { ListsView, CampaignsView } from './views/ListViews';
 import { SettingsView, IOView } from './views/SettingsViews';
 import { FormsView } from './views/FormsView';
 import { ContactModal } from './components/ContactModal';
-import { ListModal, CampaignModal, SyncSidebarModal } from './components/Modals';
+import { ListModal, CampaignModal, SyncSidebarModal, DisconnectModal } from './components/Modals';
 import { useConversationSync } from './hooks/useConversationSync';
 import { useDraftStash } from './hooks/useDraftStash';
 import { ContextWidget } from './components/ContextWidget';
 import { PresetsWidget } from './components/PresetsWidget';
+import config from './config.json';
+
+const APP_VERSION = config.version.split('.').slice(0, 2).join('.');
+
 export function App({ togBtn }) {
   const isStandalone = window.location.protocol === 'chrome-extension:' || !window.location.host.includes('voice.google.com');
   const [loaded, setLoaded] = useState(false);
@@ -84,6 +88,7 @@ export function App({ togBtn }) {
   const [campaignModal, setCampaignModal] = useState(null);
   const [formModal, setFormModal] = useState(null);
   const [syncModal, setSyncModal] = useState(false);
+  const [disconnectModal, setDisconnectModal] = useState(false);
 
   const activeContact = useConversationSync();
   useDraftStash();
@@ -94,7 +99,7 @@ export function App({ togBtn }) {
 
   function sendGSheetAction(action, payload, method = 'POST', customUrl = null) {
     const url = customUrl || settings.gsheetUrl;
-    if (!url) return Promise.resolve({ ok: false, error: 'No GSheet URL' });
+    if (!url) return Promise.resolve({ ok: false, error: `No ${config.shortName} URL` });
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'gsheetAction',
@@ -192,7 +197,7 @@ export function App({ togBtn }) {
     if (!dStr) return new Date(0);
     let s = String(dStr).trim();
     if (/^\d+$/.test(s)) return new Date(parseInt(s));
-    
+
     // Normalize timezone-less strings (e.g. from Sheets/Apps Script) to UTC to avoid local timezone interpretation offsets
     if (s.includes('-') || s.includes('/')) {
       if (!s.endsWith('Z') && !s.includes('+') && !/-\d{2}:\d{2}$/.test(s)) {
@@ -230,7 +235,7 @@ export function App({ togBtn }) {
         const detailRes = await sendGSheetAction('readDataSnapshot', { snapshotId: configMetadata.snapshotId }, 'GET', url);
         if (detailRes.ok && detailRes.snapshot && detailRes.snapshot.data) {
           const payload = detailRes.snapshot.data;
-          
+
           // Merge Settings (preserve local gsheetUrl)
           if (payload.settings) {
             setSettings(s => ({ ...s, ...payload.settings, gsheetUrl: s.gsheetUrl }));
@@ -405,12 +410,12 @@ export function App({ togBtn }) {
         else updatedContacts.push(sc);
       });
 
-      // PHASE 3: PUSH (Final Push back to GSheet)
+      // PHASE 3: PUSH (Final Push back to GSHEET)
       let pushOk = true;
       if (isLoadOnly) {
-        console.log('Sync Phase 3: Skipping push to GSheet (Load-only mode)');
+        console.log(`Sync Phase 3: Skipping push to ${config.shortName} (Load-only mode)`);
       } else {
-        console.log('Sync Phase 3: Pushing merged state back to GSheet...');
+        console.log(`Sync Phase 3: Pushing merged state back to ${config.shortName}...`);
         await gsheetSaveContactLists(updatedLists);
         const pushRes = await gsheetSaveContacts(updatedContacts, 100);
         if (!pushRes.ok) {
@@ -432,14 +437,14 @@ export function App({ togBtn }) {
         return true;
       }
     } catch (err) {
-      alert('GSheet Sync Error: ' + err.message);
+      alert(`${config.shortName} Sync Error: ` + err.message);
       return false;
     } finally {
       setSyncing(false);
     }
   }
 
-  async function handleOnboardingSetup(mode, url = '', appName = 'GV-CRM', passcode = '') {
+  async function handleOnboardingSetup(mode, url = '', appName = config.appName, passcode = '') {
     if (mode === 'local') {
       setSettings(s => ({ ...s, syncMode: 'local', gsheetUrl: '', appName, passcode }));
       return true;
@@ -467,7 +472,7 @@ export function App({ togBtn }) {
       setLists(d.lists);
       setCampaigns(d.campaigns);
       setForms(d.forms || []);
-      
+
       const loadedSettings = { ...d.settings };
       if (!loadedSettings.syncMode) {
         loadedSettings.syncMode = loadedSettings.gsheetUrl ? 'gsheet' : undefined;
@@ -476,7 +481,7 @@ export function App({ togBtn }) {
       if (loadedSettings.passcode) {
         setScreenLocked(true);
       }
-      
+
       setTimeout(() => {
         setLoaded(true);
       }, 100);
@@ -650,17 +655,17 @@ export function App({ togBtn }) {
       return;
     }
 
-    if (action === 'pause') { 
-      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'paused' } : c)); 
+    if (action === 'pause') {
+      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'paused' } : c));
       localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
-      chrome.runtime.sendMessage({ action: 'stopCampaign', id }); 
-      return; 
+      chrome.runtime.sendMessage({ action: 'stopCampaign', id });
+      return;
     }
-    if (action === 'cancel') { 
-      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'cancelled' } : c)); 
+    if (action === 'cancel') {
+      setCampaigns(cs => cs.map(c => c.id === id ? { ...c, status: 'cancelled' } : c));
       localStorage.setItem('vcrm_config_modified_at', new Date().toISOString());
-      chrome.runtime.sendMessage({ action: 'stopCampaign', id }); 
-      return; 
+      chrome.runtime.sendMessage({ action: 'stopCampaign', id });
+      return;
     }
 
     if (action === 'start' || action === 'resume') {
@@ -763,7 +768,7 @@ export function App({ togBtn }) {
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const snapshotName = `APPSTATE-${todayStr}`;
-      
+
       // 1. Save/update daily snapshot
       const res = await sendGSheetAction('saveDataSnapshot', {
         snapshotType: 'APPSTATE',
@@ -773,7 +778,7 @@ export function App({ togBtn }) {
       });
 
       if (!res || !res.ok || !res.snapshotId) {
-        throw new Error(res?.error || 'Unknown error occurred during daily GSheet backup');
+        throw new Error(res?.error || `Unknown error occurred during daily ${config.shortName} backup`);
       }
 
       // 2. Also save/update the "latest" snapshot reference
@@ -797,21 +802,16 @@ export function App({ togBtn }) {
     }
   }
 
-  async function handleDisconnectAndReset() {
-    const confirm1 = confirm(
-      "Are you sure you want to disconnect from Google Sheets and completely reset your CRM database? " +
-      "This will clear all local contacts, campaigns, custom forms, and reset settings to defaults."
-    );
-    if (!confirm1) return;
+  async function handleDisconnectAndReset(options = { downloadBackup: true, syncToGSheet: true }) {
+    setDisconnectModal(false);
 
-    // Ask to download a local backup first
-    const confirmBackup = confirm("Would you like to download a local JSON backup of your current CRM state first?");
-    if (confirmBackup) {
+    // Download local backup if checked
+    if (options.downloadBackup) {
       handleDownloadState();
     }
 
-    // If connected to Google Sheets, try to create an automatic backup snapshot
-    if (settings.syncMode === 'gsheet' && settings.gsheetUrl) {
+    // Backup snapshots to Google Sheets if checked and available
+    if (options.syncToGSheet && settings.syncMode === 'gsheet' && settings.gsheetUrl) {
       setSyncing(true);
       try {
         const todayStr = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -819,7 +819,7 @@ export function App({ togBtn }) {
         const configSnapshot = `CRM-CONFIG-AUTO-RESET-${todayStr}`;
 
         console.log('Creating auto-reset backup snapshots on Google Sheets...');
-        
+
         // 1. App State snapshot
         const resState = await sendGSheetAction('saveDataSnapshot', {
           snapshotType: 'APPSTATE',
@@ -839,24 +839,12 @@ export function App({ togBtn }) {
         });
 
         if (resState && resState.ok && resConfig && resConfig.ok) {
-          alert(
-            `✓ Automatic Google Sheets snapshots created successfully:\n` +
-            `- App State: ${appStateSnapshot}\n` +
-            `- CRM Config: ${configSnapshot}`
-          );
+          console.log(`✓ Automatic Google Sheets snapshots created successfully:\n- App State: ${appStateSnapshot}\n- CRM Config: ${configSnapshot}`);
         } else {
           throw new Error('Google Sheets responded but one or both snapshots failed to save.');
         }
       } catch (err) {
-        console.error(err);
-        const proceed = confirm(
-          `⚠️ Failed to create Google Sheets backup snapshots: ${err.message}\n\n` +
-          `Do you want to proceed with the database reset anyway? Your local data will be deleted.`
-        );
-        if (!proceed) {
-          setSyncing(false);
-          return;
-        }
+        console.error('Failed to create Google Sheets backup snapshots:', err.message);
       } finally {
         setSyncing(false);
       }
@@ -892,8 +880,6 @@ export function App({ togBtn }) {
     });
 
     localStorage.removeItem('vcrm_config_modified_at');
-    
-    alert('✓ CRM Database reset complete. Redirecting to onboarding setup.');
     setView('contacts');
   }
 
@@ -993,7 +979,7 @@ export function App({ togBtn }) {
     if (!digits) return;
 
     chrome.runtime.sendMessage({ action: 'openChat', number: digits }, (res) => {
-      if (res && res.error) console.error('GV-CRM Open Chat Error:', res.error);
+      if (res && res.error) console.error(`${config.appName} Open Chat Error:`, res.error);
     });
 
     if (!isStandalone) {
@@ -1047,475 +1033,474 @@ export function App({ togBtn }) {
         ) : (
           <>
 
-        {/* ── Premium Dark Glassmorphic Topbar Header ── */}
-        <div style={{
-          flexShrink: 0,
-          height: '68px',
-          background: 'linear-gradient(135deg, #1e1b4b, #090514)',
-          borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
-          padding: '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-          zIndex: 10
-        }}>
-
-          {/* Logo Brand Panel */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+            {/* ── Premium Dark Glassmorphic Topbar Header ── */}
             <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              flexShrink: 0,
+              height: '68px',
+              background: 'linear-gradient(135deg, #1e1b4b, #090514)',
+              borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
+              padding: '0 20px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: '11px',
-              fontWeight: 800,
-              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
-              animation: !isStandalone ? 'vcrm-pulse-shadow 4s ease-in-out infinite' : 'none',
-              border: !isStandalone ? '1px solid rgba(255, 255, 255, 0.15)' : 'none'
+              justifyContent: 'space-between',
+              gap: '16px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+              zIndex: 10
             }}>
-              GV
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>{settings.appName || 'GV-CRM'}</div>
-                {isWorking && (
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '9px',
-                    fontWeight: 700,
-                    color: activeCampaignStatus ? '#fed7aa' : '#a7f3d0',
-                    background: activeCampaignStatus ? 'rgba(249, 115, 22, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                    border: activeCampaignStatus ? '1px solid rgba(249, 115, 22, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
-                    borderRadius: '99px',
-                    padding: '2px 8px',
-                    animation: 'vcrm-sync-pulse 1.5s infinite ease-in-out',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    lineHeight: 'normal'
-                  }}>
-                    <span style={{
-                      width: '5px',
-                      height: '5px',
-                      borderRadius: '50%',
-                      background: activeCampaignStatus ? '#f97316' : '#10b981',
-                      boxShadow: activeCampaignStatus ? '0 0 6px #f97316' : '0 0 6px #10b981'
-                    }} />
-                    {activeCampaignStatus ? 'Campaign' : 'Syncing'}
-                  </span>
-                )}
-              </div>
-              <div style={{
-                display: 'inline-flex',
-                fontSize: '9px',
-                fontWeight: 700,
-                color: 'rgba(255, 255, 255, 0.8)',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '99px',
-                padding: '1px 6px',
-                marginTop: '1px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.3px'
-              }}>
-                V2.0
-              </div>
-            </div>
-          </div>
 
-          {/* macOS / Apple-style Segmented Nav Controls (Dark Theme) */}
-          <div style={{
-            display: 'flex',
-            background: 'rgba(255, 255, 255, 0.04)',
-            padding: '4px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            overflow: 'hidden',
-            flexShrink: 0
-          }}>
-            {TABS.map(([v, l, count]) => {
-              const isActive = view === v;
-              return (
-                <button
-                  key={v}
-                  onClick={() => switchView(v)}
-                  style={{
-                    padding: '6px 12px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '12.5px',
-                    fontWeight: isActive ? 700 : 500,
-                    lineHeight: 1.4,
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'Inter,sans-serif',
-                    background: isActive ? 'linear-gradient(135deg, #4f46e5, #3b82f6)' : 'transparent',
-                    color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15)' : 'none'
-                  }}
-                  onMouseEnter={e => {
-                    if (!isActive) e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive) e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
-                  }}
-                >
-                  {l}
-                  {count !== null && (
-                    <span style={{
-                      background: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-                      color: isActive ? '#4f46e5' : 'rgba(255, 255, 255, 0.6)',
-                      borderRadius: '99px',
-                      padding: '1px 6px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                      transition: 'all 0.18s'
-                    }}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Action buttons and Minimalist Close triggers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
-
-            {/* Context-aware Quick Action Button */}
-            {addBtn && (
-              <button
-                onClick={addBtn.action}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
+              {/* Logo Brand Panel */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
                   background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontFamily: 'Inter,sans-serif',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  transition: 'all 0.15s ease',
-                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
-                }}
-                onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
-                onMouseLeave={e => e.currentTarget.style.opacity = 1}
-              >
-                {addBtn.label}
-              </button>
-            )}
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
+                  animation: !isStandalone ? 'vcrm-pulse-shadow 4s ease-in-out infinite' : 'none',
+                  border: !isStandalone ? '1px solid rgba(255, 255, 255, 0.15)' : 'none'
+                }}>
+                  {config.shortName}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', lineHeight: '1.2' }}>{settings.appName || config.appName}</div>
+                    {isWorking && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        color: activeCampaignStatus ? '#fed7aa' : '#a7f3d0',
+                        background: activeCampaignStatus ? 'rgba(249, 115, 22, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                        border: activeCampaignStatus ? '1px solid rgba(249, 115, 22, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '99px',
+                        padding: '2px 8px',
+                        animation: 'vcrm-sync-pulse 1.5s infinite ease-in-out',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        lineHeight: 'normal'
+                      }}>
+                        <span style={{
+                          width: '5px',
+                          height: '5px',
+                          borderRadius: '50%',
+                          background: activeCampaignStatus ? '#f97316' : '#10b981',
+                          boxShadow: activeCampaignStatus ? '0 0 6px #f97316' : '0 0 6px #10b981'
+                        }} />
+                        {activeCampaignStatus ? 'Campaign' : 'Syncing'}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    display: 'inline-flex',
+                    fontSize: '8px',
+                    fontWeight: 700,
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '99px',
+                    padding: '1px 8px',
+                    marginTop: '4px',
+                    letterSpacing: '0.3px'
+                  }}>
+                    {config.appName} {APP_VERSION}
+                  </div>
+                </div>
+              </div>
 
-            {/* Passcode Lock Button (only if passcode is configured) */}
-            {settings.passcode && (
-              <button
-                onClick={() => setScreenLocked(true)}
-                title="Lock CRM Workspace"
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                  marginLeft: '4px'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#6366f1';
-                  e.currentTarget.style.color = '#ffffff';
-                  e.currentTarget.style.background = '#6366f1';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.45)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <span style={{ fontSize: '15px' }}>🔒</span>
-              </button>
-            )}
+              {/* macOS / Apple-style Segmented Nav Controls (Dark Theme) */}
+              <div style={{
+                display: 'flex',
+                background: 'rgba(255, 255, 255, 0.04)',
+                padding: '4px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                overflow: 'hidden',
+                flexShrink: 0
+              }}>
+                {TABS.map(([v, l, count]) => {
+                  const isActive = view === v;
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => switchView(v)}
+                      style={{
+                        padding: '6px 12px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '12.5px',
+                        fontWeight: isActive ? 700 : 500,
+                        lineHeight: 1.4,
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'Inter,sans-serif',
+                        background: isActive ? 'linear-gradient(135deg, #4f46e5, #3b82f6)' : 'transparent',
+                        color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15)' : 'none'
+                      }}
+                      onMouseEnter={e => {
+                        if (!isActive) e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={e => {
+                        if (!isActive) e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+                      }}
+                    >
+                      {l}
+                      {count !== null && (
+                        <span style={{
+                          background: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                          color: isActive ? '#4f46e5' : 'rgba(255, 255, 255, 0.6)',
+                          borderRadius: '99px',
+                          padding: '1px 6px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          fontVariantNumeric: 'tabular-nums',
+                          transition: 'all 0.18s'
+                        }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Exit/Close trigger */}
-            {!isStandalone && (
-              <button
-                onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } }}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                  marginLeft: '4px'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#ef4444';
-                  e.currentTarget.style.color = '#ffffff';
-                  e.currentTarget.style.background = '#ef4444';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
-              </button>
-            )}
-          </div>
-        </div>
+              {/* Action buttons and Minimalist Close triggers */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
 
-        {/* ── Filter bar ── */}
-        {(['contacts', 'lists'].includes(view)) && (
-          <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '140px', maxWidth: '260px' }}>
-              <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 12px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
-            </div>
-            {view === 'contacts' && (() => {
-              const filteredCount = contacts.filter(c => {
-                if (filterStatus && c.status !== filterStatus) return false;
-                if (filterTag && !(c.tags || []).includes(filterTag)) return false;
-                if (filterMembershipLevel && c.membershipLevel !== filterMembershipLevel) return false;
-                if (filterLeadSource && c.leadSource !== filterLeadSource) return false;
-                if (filterCategory && c.category !== filterCategory) return false;
-                if (filterListId) {
-                  const e = (c.lists || []).find(e => String(e.listId) === String(filterListId));
-                  if (!e) return false;
-                  if (filterListStatus && e.status !== filterListStatus) return false;
-                }
-                if (search) {
-                  const q = search.toLowerCase();
-                  return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
-                }
-                return true;
-              }).length;
-
-              return (
-                <>
-                  {[
-                    ['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
-                    ['All memberships', setFilterMembershipLevel, filterMembershipLevel, settings.membershipLevels || []],
-                    ['All sources', setFilterLeadSource, filterLeadSource, settings.leadSources || []],
-                    ['All categories', setFilterCategory, filterCategory, settings.categories || []],
-                    ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
-                    ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
-                    ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
-                  ].map(([placeholder, setter, val, opts], i) => (
-                    <select key={i} value={val} onChange={e => setter(e.target.value)} style={{ padding: '6px 26px 6px 10px', background: `#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center`, border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', maxWidth: '150px' }}>
-                      <option value="">{placeholder}</option>
-                      {opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.id || o} value={o.id || o}>{o.label || o}</option>)}
-                    </select>
-                  ))}
-                  <span style={{ fontSize: '11.5px', color: "#94a3b8", whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', marginLeft: 'auto' }}>
-                    {filteredCount} of {contacts.length}
-                  </span>
+                {/* Context-aware Quick Action Button */}
+                {addBtn && (
                   <button
-                    onClick={toggleFreeze}
+                    onClick={addBtn.action}
                     style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontFamily: 'Inter,sans-serif',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 1}
+                  >
+                    {addBtn.label}
+                  </button>
+                )}
+
+                {/* Passcode Lock Button (only if passcode is configured) */}
+                {settings.passcode && (
+                  <button
+                    onClick={() => setScreenLocked(true)}
+                    title="Lock CRM Workspace"
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      padding: '5px 10px',
-                      background: freezeCols ? '#eef2ff' : '#f1f5f9',
-                      border: freezeCols ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-                      borderRadius: '7px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: freezeCols ? '#4f46e5' : '#475569',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      transition: 'all 0.15s ease'
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      transition: 'all 0.15s ease',
+                      marginLeft: '4px'
                     }}
                     onMouseEnter={e => {
-                      if (!freezeCols) {
-                        e.currentTarget.style.borderColor = '#cbd5e1';
-                        e.currentTarget.style.background = '#e2e8f0';
-                      }
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.color = '#ffffff';
+                      e.currentTarget.style.background = '#6366f1';
+                      e.currentTarget.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.45)';
                     }}
                     onMouseLeave={e => {
-                      if (!freezeCols) {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.background = '#f1f5f9';
-                      }
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                      e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    <span style={{ fontSize: '12px' }}>❄️</span>
-                    <span>{freezeCols ? 'Frozen' : 'Freeze'}</span>
+                    <span style={{ fontSize: '15px' }}>🔒</span>
                   </button>
-                </>
-              );
-            })()}
-          </div>
-        )}
+                )}
 
-        {/* ── Body ── */}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-          {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} filterMembershipLevel={filterMembershipLevel} filterLeadSource={filterLeadSource} filterCategory={filterCategory} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
-
-          {/* Bulk Actions Bar */}
-          {view === 'contacts' && selectedIds.length > 0 && (
-            <div style={{
-              position: 'absolute', bottom: '20px', left: '20px',
-              background: '#0f172a', color: '#fff', padding: '10px 20px', borderRadius: '12px',
-              display: 'flex', flexDirection: bulkSelCollapsed ? 'row' : 'column', alignItems: bulkSelCollapsed ? 'center' : 'flex-start', gap: '14px',
-              boxShadow: '0 20px 50px rgba(15,23,42,.4)',
-              zIndex: 100, border: '1px solid rgba(255,255,255,.1)',
-              width: 'max-content', maxWidth: 'calc(100% - 40px)'
-            }}>
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', cursor: 'pointer' }}
-                onClick={() => setBulkSelCollapsed(!bulkSelCollapsed)}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>{selectedIds.length} selected</div>
-                <span style={{ fontSize: '16px', color: '#94a3b8', lineHeight: 1, display: 'inline-block', transition: 'transform 0.2s', transform: bulkSelCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-
-                {bulkSelCollapsed && (
-                  <div style={{ marginLeft: 'auto' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedIds([]); }} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px', padding: '0 5px' }}>Clear</button>
-                  </div>
+                {/* Exit/Close trigger */}
+                {!isStandalone && (
+                  <button
+                    onClick={() => { setOpen(false); if (togBtn) { togBtn.style.setProperty('display', 'flex', 'important'); } }}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      transition: 'all 0.15s ease',
+                      marginLeft: '4px'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = '#ef4444';
+                      e.currentTarget.style.color = '#ffffff';
+                      e.currentTarget.style.background = '#ef4444';
+                      e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.45)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                      e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1 }}>✕</span>
+                  </button>
                 )}
               </div>
+            </div>
 
-              {!bulkSelCollapsed && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', width: '100%' }}>
-                  {/* Set Status */}
-                  <select onChange={e => {
-                    const s = e.target.value; if (!s) return;
-                    setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, status: s } : c));
-                    e.target.value = '';
-                  }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">Set Status…</option>
-                    {settings.contactStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-
-                  {/* Add to List */}
-                  <select onChange={e => {
-                    const lid = e.target.value; if (!lid) return;
-                    setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: [...(c.lists || []).filter(x => x.listId !== lid), { listId: lid, status: settings.listStatuses[0] || '' }] } : c));
-                    e.target.value = '';
-                  }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">Add to List…</option>
-                    {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
-
-                  {/* Remove from List */}
-                  <select onChange={e => {
-                    const lid = e.target.value; if (!lid) return;
-                    setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: (c.lists || []).filter(x => x.listId !== lid) } : c));
-                    e.target.value = '';
-                  }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">Remove from List…</option>
-                    {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
-
-                  <button onClick={() => {
-                    if (confirm(`Delete ${selectedIds.length} contacts?`)) {
-                      setContacts(cs => cs.filter(c => !selectedIds.includes(c.id)));
-                      setSelectedIds([]);
+            {/* ── Filter bar ── */}
+            {(['contacts', 'lists'].includes(view)) && (
+              <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid #e2e8f0`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '140px', maxWidth: '260px' }}>
+                  <input value={search} onInput={e => setSearch(e.target.value)} placeholder={view === 'contacts' ? 'Search contacts…' : 'Search lists…'} style={{ display: 'block', width: '100%', padding: '6px 12px', background: '#f1f5f9', border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none' }} />
+                </div>
+                {view === 'contacts' && (() => {
+                  const filteredCount = contacts.filter(c => {
+                    if (filterStatus && c.status !== filterStatus) return false;
+                    if (filterTag && !(c.tags || []).includes(filterTag)) return false;
+                    if (filterMembershipLevel && c.membershipLevel !== filterMembershipLevel) return false;
+                    if (filterLeadSource && c.leadSource !== filterLeadSource) return false;
+                    if (filterCategory && c.category !== filterCategory) return false;
+                    if (filterListId) {
+                      const e = (c.lists || []).find(e => String(e.listId) === String(filterListId));
+                      if (!e) return false;
+                      if (filterListStatus && e.status !== filterListStatus) return false;
                     }
-                  }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Delete</button>
+                    if (search) {
+                      const q = search.toLowerCase();
+                      return ['name', 'phone', 'email', 'handle', 'location', 'membershipLevel', 'leadSource', 'category'].some(k => (c[k] || '').toLowerCase().includes(q)) || (c.tags || []).some(t => t.toLowerCase().includes(q));
+                    }
+                    return true;
+                  }).length;
 
-                  <div style={{ flex: 1 }}></div>
-                  <button onClick={() => setSelectedIds([])} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px' }}>Clear</button>
+                  return (
+                    <>
+                      {[
+                        ['All statuses', setFilterStatus, filterStatus, settings.contactStatuses],
+                        ['All memberships', setFilterMembershipLevel, filterMembershipLevel, settings.membershipLevels || []],
+                        ['All sources', setFilterLeadSource, filterLeadSource, settings.leadSources || []],
+                        ['All categories', setFilterCategory, filterCategory, settings.categories || []],
+                        ['All lists', v => { setFilterListId(v); setFilterListStatus(''); }, filterListId, lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => ({ id: l.id, label: l.name }))],
+                        ...(filterListId ? [['All states', setFilterListStatus, filterListStatus, settings.listStatuses]] : []),
+                        ...(allTagsList.length ? [['All tags', setFilterTag, filterTag, allTagsList]] : []),
+                      ].map(([placeholder, setter, val, opts], i) => (
+                        <select key={i} value={val} onChange={e => setter(e.target.value)} style={{ padding: '6px 26px 6px 10px', background: `#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center`, border: `1.5px solid #e2e8f0`, borderRadius: '7px', fontSize: '12.5px', color: "#0f172a", outline: 'none', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', maxWidth: '150px' }}>
+                          <option value="">{placeholder}</option>
+                          {opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.id || o} value={o.id || o}>{o.label || o}</option>)}
+                        </select>
+                      ))}
+                      <span style={{ fontSize: '11.5px', color: "#94a3b8", whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', marginLeft: 'auto' }}>
+                        {filteredCount} of {contacts.length}
+                      </span>
+                      <button
+                        onClick={toggleFreeze}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '5px 10px',
+                          background: freezeCols ? '#eef2ff' : '#f1f5f9',
+                          border: freezeCols ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+                          borderRadius: '7px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: freezeCols ? '#4f46e5' : '#475569',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => {
+                          if (!freezeCols) {
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.background = '#e2e8f0';
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (!freezeCols) {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.background = '#f1f5f9';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: '12px' }}>❄️</span>
+                        <span>{freezeCols ? 'Frozen' : 'Freeze'}</span>
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ── Body ── */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+              {view === 'contacts' && <ContactsView contacts={contacts} lists={lists} settings={settings} search={search} filterStatus={filterStatus} filterListId={filterListId} filterListStatus={filterListStatus} filterTag={filterTag} filterMembershipLevel={filterMembershipLevel} filterLeadSource={filterLeadSource} filterCategory={filterCategory} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onEdit={c => setContactModal(c)} selectedIds={selectedIds} onSelect={setSelectedIds} onOpenMessage={handleOpenMessage} freezeCols={freezeCols} />}
+
+              {/* Bulk Actions Bar */}
+              {view === 'contacts' && selectedIds.length > 0 && (
+                <div style={{
+                  position: 'absolute', bottom: '20px', left: '20px',
+                  background: '#0f172a', color: '#fff', padding: '10px 20px', borderRadius: '12px',
+                  display: 'flex', flexDirection: bulkSelCollapsed ? 'row' : 'column', alignItems: bulkSelCollapsed ? 'center' : 'flex-start', gap: '14px',
+                  boxShadow: '0 20px 50px rgba(15,23,42,.4)',
+                  zIndex: 100, border: '1px solid rgba(255,255,255,.1)',
+                  width: 'max-content', maxWidth: 'calc(100% - 40px)'
+                }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', cursor: 'pointer' }}
+                    onClick={() => setBulkSelCollapsed(!bulkSelCollapsed)}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>{selectedIds.length} selected</div>
+                    <span style={{ fontSize: '16px', color: '#94a3b8', lineHeight: 1, display: 'inline-block', transition: 'transform 0.2s', transform: bulkSelCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+
+                    {bulkSelCollapsed && (
+                      <div style={{ marginLeft: 'auto' }}>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedIds([]); }} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px', padding: '0 5px' }}>Clear</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {!bulkSelCollapsed && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', width: '100%' }}>
+                      {/* Set Status */}
+                      <select onChange={e => {
+                        const s = e.target.value; if (!s) return;
+                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, status: s } : c));
+                        e.target.value = '';
+                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
+                        <option value="">Set Status…</option>
+                        {settings.contactStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+
+                      {/* Add to List */}
+                      <select onChange={e => {
+                        const lid = e.target.value; if (!lid) return;
+                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: [...(c.lists || []).filter(x => x.listId !== lid), { listId: lid, status: settings.listStatuses[0] || '' }] } : c));
+                        e.target.value = '';
+                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
+                        <option value="">Add to List…</option>
+                        {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+
+                      {/* Remove from List */}
+                      <select onChange={e => {
+                        const lid = e.target.value; if (!lid) return;
+                        setContacts(cs => cs.map(c => selectedIds.includes(c.id) ? { ...c, lists: (c.lists || []).filter(x => x.listId !== lid) } : c));
+                        e.target.value = '';
+                      }} style={{ background: 'rgba(255,255,255,.1)', border: 'none', color: '#fff', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}>
+                        <option value="">Remove from List…</option>
+                        {lists.filter(l => l.status !== 'inactive').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+
+                      <button onClick={() => {
+                        if (confirm(`Delete ${selectedIds.length} contacts?`)) {
+                          setContacts(cs => cs.filter(c => !selectedIds.includes(c.id)));
+                          setSelectedIds([]);
+                        }
+                      }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Delete</button>
+
+                      <div style={{ flex: 1 }}></div>
+                      <button onClick={() => setSelectedIds([])} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', fontSize: '12px' }}>Clear</button>
+                    </div>
+                  )}
                 </div>
               )}
+              {view === 'lists' && <ListsView lists={lists} contacts={contacts} settings={settings} search={search} onEdit={l => setListModal(l)} onDelete={id => {
+                if (confirm('Delete list?')) {
+                  setLists(ls => ls.filter(l => l.id !== id));
+                  setContacts(cs => cs.map(c => ({ ...c, lists: (c.lists || []).filter(e => e.listId !== id) })));
+                  if (settings.gsheetAuto) gsheetDeleteList(id);
+                }
+              }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
+              {view === 'campaigns' && (
+                <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
+                  <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} isStandalone={isStandalone} forms={forms} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }} onDuplicate={handleDuplicateCampaign} />
+                </div>
+              )}
+              {view === 'forms' && (
+                <FormsView
+                  forms={forms}
+                  editingForm={formModal}
+                  onEdit={f => setFormModal(f)}
+                  onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }}
+                  onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setFormModal(null); }}
+                  onClose={() => setFormModal(null)}
+                />
+              )}
+              {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => { setSettings(s => ({ ...s, [k]: v })); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); }} onManualGSheetSync={handleGSheetSync} onManualConfigBackup={handleManualConfigBackup} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} onDisconnectAndReset={() => setDisconnectModal(true)} />}
             </div>
-          )}
-          {view === 'lists' && <ListsView lists={lists} contacts={contacts} settings={settings} search={search} onEdit={l => setListModal(l)} onDelete={id => {
-            if (confirm('Delete list?')) {
-              setLists(ls => ls.filter(l => l.id !== id));
-              setContacts(cs => cs.map(c => ({ ...c, lists: (c.lists || []).filter(e => e.listId !== id) })));
-              if (settings.gsheetAuto) gsheetDeleteList(id);
-            }
-          }} onFilter={id => { setView('contacts'); setSearch(''); setFilterStatus(''); setFilterListId(id); setFilterListStatus(''); setFilterTag(''); }} />}
-          {view === 'campaigns' && (
-            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
-              <CampaignsView campaigns={campaigns} contacts={contacts} lists={lists} activeStatus={activeCampaignStatus} isStandalone={isStandalone} forms={forms} onEdit={c => setCampaignModal(c)} onUpdate={handleCampaignUpdate} onDelete={id => { if (confirm('Delete campaign?')) { setCampaigns(cs => cs.filter(c => c.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }} onDuplicate={handleDuplicateCampaign} />
-            </div>
-          )}
-          {view === 'forms' && (
-            <FormsView
-              forms={forms}
-              editingForm={formModal}
-              onEdit={f => setFormModal(f)}
-              onDelete={id => { if (confirm('Delete form?')) { setForms(fs => fs.filter(f => f.id !== id)); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); } }}
-              onSave={f => { setForms(fs => { const i = fs.findIndex(x => x.id === f.id); return i >= 0 ? fs.map((x, j) => j === i ? f : x) : [f, ...fs]; }); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); setFormModal(null); }}
-              onClose={() => setFormModal(null)}
-            />
-          )}
-          {view === 'settings' && <SettingsView settings={settings} onUpdate={(k, v) => { setSettings(s => ({ ...s, [k]: v })); localStorage.setItem('vcrm_config_modified_at', new Date().toISOString()); }} onManualGSheetSync={handleGSheetSync} onManualConfigBackup={handleManualConfigBackup} contacts={contacts} lists={lists} onImport={handleImport} onDownloadState={handleDownloadState} onLoadState={handleLoadState} onGSheetBackup={handleGSheetBackup} onGSheetRestore={handleGSheetRestore} onSyncSidebar={handleSyncSidebar} onDisconnectAndReset={handleDisconnectAndReset} />}
-        </div>
-      </>
-    )}
+          </>
+        )}
 
-    {syncing && (
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(9, 5, 20, 0.75)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2147483647,
-        color: '#fff',
-        pointerEvents: 'auto'
-      }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          border: '4px solid rgba(99, 102, 241, 0.2)',
-          borderTopColor: '#6366f1',
-          borderRadius: '50%',
-          animation: 'vcrm-spin 1s infinite linear',
-          marginBottom: '16px',
-          boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)'
-        }} />
-        <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px' }}>
-          Synchronizing with Google Sheets...
-        </div>
-        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>
-          Please do not close this panel
-        </div>
+        {syncing && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(9, 5, 20, 0.75)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2147483647,
+            color: '#fff',
+            pointerEvents: 'auto'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              border: '4px solid rgba(99, 102, 241, 0.2)',
+              borderTopColor: '#6366f1',
+              borderRadius: '50%',
+              animation: 'vcrm-spin 1s infinite linear',
+              marginBottom: '16px',
+              boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)'
+            }} />
+            <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px' }}>
+              Synchronizing with Google Sheets...
+            </div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>
+              Please do not close this panel
+            </div>
+          </div>
+        )}
       </div>
-    )}
-  </div>
 
       {/* ── Modals ── */}
       {contactModal && <ContactModal
@@ -1554,6 +1539,8 @@ export function App({ togBtn }) {
 
       {syncModal && <SyncSidebarModal lists={lists} settings={settings} onSync={executeSyncSidebar} onClose={() => setSyncModal(false)} />}
 
+      {disconnectModal && <DisconnectModal settings={settings} onConfirm={handleDisconnectAndReset} onClose={() => setDisconnectModal(false)} />}
+
       {/* Context Widget (Phase 3) */}
       <ContextWidget
         activeContact={activeContact}
@@ -1574,11 +1561,11 @@ export function App({ togBtn }) {
 export function WelcomeOnboarding({ settings, onSetup, onClose }) {
   const [step, setStep] = useState('select'); // 'select' | 'gsheet'
   const [selectedMode, setSelectedMode] = useState(null); // 'local' | 'gsheet'
-  const [appName, setAppName] = useState('GV-CRM');
+  const [appName, setAppName] = useState('My App Sheet');
   const [gsheetUrl, setGsheetUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [usePasscode, setUsePasscode] = useState(false);
+  const [usePasscode, setUsePasscode] = useState(true);
   const [passcode, setPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
 
@@ -1634,7 +1621,7 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
     }
     setLoading(true);
     setError('');
-    
+
     const success = await onSetup('gsheet', gsheetUrl.trim(), appName.trim(), usePasscode ? passcode : '');
     setLoading(false);
     if (!success) {
@@ -1721,16 +1708,16 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
           boxShadow: '0 0 30px rgba(99, 102, 241, 0.4)',
           marginBottom: '24px'
         }}>
-          GV
+          {config.shortName}
         </div>
 
         {step === 'select' ? (
           <>
             <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
-              Welcome to GV-CRM
+              {config.appName}
             </h1>
             <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-              Select how you would like to store and synchronize your contacts and customer data.
+              CRM for Google Sheet + Voice for contact management
             </p>
 
             <div style={{ marginBottom: '24px', textAlign: 'left', width: '100%' }}>
@@ -1785,7 +1772,7 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
                   }} />
                 </button>
               </div>
-              
+
               {usePasscode && (
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                   <div style={{ flex: 1 }}>
@@ -1853,9 +1840,38 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
               </div>
             )}
 
+            <div style={{ marginBottom: '16px', textAlign: 'left', width: '100%' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Select Connection Method
+              </label>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', marginBottom: '32px' }}>
-              {/* Option 1: Local */}
-              <div 
+              {/* Option 1: GSHEET (Preferred) */}
+              <div
+                onClick={() => handleSelectMode('gsheet')}
+                style={{
+                  padding: '20px',
+                  borderRadius: '16px',
+                  border: `2px solid ${selectedMode === 'gsheet' ? '#6366f1' : 'rgba(255,255,255,0.06)'}`,
+                  background: selectedMode === 'gsheet' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedMode === 'gsheet' ? '0 0 20px rgba(99, 102, 241, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '20px' }}>🔌</span>
+                  <span style={{ fontWeight: 700, fontSize: '16px' }}>Google Sheets Cloud Sync (Recommended)</span>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
+                  Connect to your own Google Sheet. Safely backup and synchronize data across multiple devices.
+                </p>
+              </div>
+
+              {/* Option 2: Local Fallback */}
+              <div
                 onClick={() => handleSelectMode('local')}
                 style={{
                   padding: '20px',
@@ -1874,29 +1890,6 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
                 </div>
                 <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
                   Keep your data strictly on this device. Fast, zero-setup, and 100% private.
-                </p>
-              </div>
-
-              {/* Option 2: GSheet */}
-              <div 
-                onClick={() => handleSelectMode('gsheet')}
-                style={{
-                  padding: '20px',
-                  borderRadius: '16px',
-                  border: `2px solid ${selectedMode === 'gsheet' ? '#6366f1' : 'rgba(255,255,255,0.06)'}`,
-                  background: selectedMode === 'gsheet' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedMode === 'gsheet' ? '0 0 20px rgba(99, 102, 241, 0.15)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '20px' }}>🔌</span>
-                  <span style={{ fontWeight: 700, fontSize: '16px' }}>Google Sheets Cloud Sync</span>
-                </div>
-                <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
-                  Connect to your own Google Sheet. Safely backup and synchronize data across multiple devices.
                 </p>
               </div>
             </div>
@@ -2033,7 +2026,7 @@ export function WelcomeOnboarding({ settings, onSetup, onClose }) {
           </form>
         )}
       </div>
-      
+
       <style>{`
         @keyframes vcrm-spin {
           0% { transform: rotate(0deg); }

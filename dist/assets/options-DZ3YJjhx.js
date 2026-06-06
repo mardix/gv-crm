@@ -1,0 +1,1 @@
+import"./modulepreload-polyfill-wMinxHhO.js";import{n as e,o as t,t as n}from"./jsxRuntime.module-D3zxQMLj.js";import{n as r,t as i}from"./styles-DduMqBU-.js";var a=document.createElement(`style`);a.textContent=i,document.head.appendChild(a),document.title=`${e.appName} Standalone`,t(n(r,{}),document.getElementById(`app`));

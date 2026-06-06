@@ -1,6 +1,6 @@
 # Google Sheets Integration Guide
 
-This guide details how to integrate **GV-CRM** with **Google Sheets** for robust, cross-device database synchronization and cloud backups.
+This guide details how to integrate **GSHEET CRM** with **Google Sheets** for robust, cross-device database synchronization and cloud backups.
 
 The backend integration is powered by **Google Apps Script** running as a Web App API over a target Google Sheet. It dynamically manages contacts, list segments, list memberships, and gzipped state backups.
 
@@ -26,19 +26,19 @@ To set up your Google Sheets backend:
    - Click **Deploy** ➔ **New deployment** (top-right).
    - Click the gear icon next to "Select type" and select **Web app**.
    - Configure the deployment:
-     - **Description**: `GV-CRM Web App Database API`
+     - **Description**: `GSHEET CRM Web App Database API`
      - **Execute as**: `Me (your-email@gmail.com)`
      - **Who has access**: `Anyone` (this allows the extension to make POST/GET requests without complex OAuth login flows).
    - Click **Deploy**.
-   - Grant permissions when prompted (Google may warn you the app is unverified; click *Advanced* ➔ *Go to GV-CRM (unsafe)* to proceed).
+   - Grant permissions when prompted (Google may warn you the app is unverified; click *Advanced* ➔ *Go to GSHEET CRM (unsafe)* to proceed).
 8. Copy the generated **Web App URL** (e.g., `https://script.google.com/macros/s/.../exec`).
-9. Paste this URL into the **Storage & Sync** tab inside the GV-CRM extension Settings, or use it during the onboarding setup.
+9. Paste this URL into the **Storage & Sync** tab inside the GSHEET CRM extension Settings, or use it during the onboarding setup.
 
 ---
 
 ## 📊 Database Schema & Sheet Structures
 
-When you configure the extension for the first time or manually run the sync, GV-CRM triggers the `initSchema` action. The script automatically generates the necessary tables and headers. 
+When you configure the extension for the first time or manually run the sync, GSHEET CRM triggers the `initSchema` action. The script automatically generates the necessary tables and headers. 
 
 > [!NOTE]
 > Do not modify the required column header names. However, you can add extra custom columns or reorder the existing ones as columns are looked up dynamically by header text.

@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import config from '../config.json';
 import { Btn } from '../components/Btn';
 import { palFor } from '../utils/utils';
 
@@ -305,7 +306,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: "#475569", marginBottom: '6px' }}>App / Workspace Name</label>
-                    <input type="text" placeholder="GV-CRM" value={settings.appName || ''} onInput={e => onUpdate('appName', e.target.value)}
+                    <input type="text" placeholder={config.appName} value={settings.appName || ''} onInput={e => onUpdate('appName', e.target.value)}
                       style={{ width: '100%', padding: '12px 16px', border: `1.5px solid #cbd5e1`, borderRadius: '10px', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box', background: '#fff', color: '#0f172a' }}
                       onFocus={e => { e.target.style.borderColor = "#4f46e5"; e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,.1)'; }}
                       onBlur={e => { e.target.style.borderColor = "#cbd5e1"; e.target.style.boxShadow = 'none'; }} />
@@ -334,7 +335,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
                       </div>
                     </div>
 
-                    {/* Option 2: GSheet */}
+                    {/* Option 2: GSHEET */}
                     <div 
                       onClick={() => onUpdate('syncMode', 'gsheet')}
                       style={{
@@ -361,7 +362,7 @@ export function SettingsView({ settings, onUpdate, onManualGSheetSync, onManualC
 
               {settings.syncMode === 'gsheet' ? (
                 <SettingsCard
-                  title="GSheet CRM Sync"
+                  title={`${config.appName} Sync`}
                   desc="Synchronize contacts, lists, and memberships directly to a Google Sheet via Apps Script."
                   action={
                     <span style={{
@@ -890,7 +891,7 @@ export function IOView({ contacts, lists, onImport, onDownloadState, onLoadState
                       gap: '8px'
                     }}>
                       <div style={{ fontSize: '13px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>✅</span> GSheet Backup Successful!
+                        <span>✅</span> {config.shortName} Backup Successful!
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
                         <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Snapshot ID:</span>

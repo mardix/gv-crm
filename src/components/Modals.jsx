@@ -422,3 +422,78 @@ export function SyncSidebarModal({ lists, settings, onSync, onClose }) {
     </Modal>
   );
 }
+
+export function DisconnectModal({ settings, onConfirm, onClose }) {
+  const [downloadBackup, setDownloadBackup] = useState(true);
+  const isGSheetAvailable = settings.syncMode === 'gsheet' && settings.gsheetUrl;
+  const [syncToGSheet, setSyncToGSheet] = useState(isGSheetAvailable);
+
+  const footer = (
+    <>
+      <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      <Btn variant="danger" onClick={() => onConfirm({ downloadBackup, syncToGSheet })}>
+        Confirm Reset
+      </Btn>
+    </>
+  );
+
+  return (
+    <Modal title="⚠️ Disconnect & Reset Database" onClose={onClose} footer={footer}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <p style={{ fontSize: '13.5px', color: '#ef4444', fontWeight: 600, margin: '0 0 4px 0', lineHeight: '1.5' }}>
+          Warning: You are about to disconnect and completely reset your CRM database.
+        </p>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
+          This will permanently delete all locally stored contacts, campaigns, custom forms, and reset settings to defaults.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          {/* Checkbox 1: Download Local Backup */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={downloadBackup}
+              onChange={e => setDownloadBackup(e.target.checked)}
+              style={{ width: '17px', height: '17px', marginTop: '2px', accentColor: '#4f46e5' }}
+            />
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>Download Local JSON Backup</span>
+              <p style={{ fontSize: '11.5px', color: '#64748b', margin: '2px 0 0 0', lineHeight: '1.4' }}>
+                Download a local backup of your contacts, lists, campaigns, and configuration.
+              </p>
+            </div>
+          </label>
+
+          {/* Checkbox 2: Create GSheet Snapshots (if available) */}
+          {isGSheetAvailable ? (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px' }}>
+              <input
+                type="checkbox"
+                checked={syncToGSheet}
+                onChange={e => setSyncToGSheet(e.target.checked)}
+                style={{ width: '17px', height: '17px', marginTop: '2px', accentColor: '#4f46e5' }}
+              />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>Backup Snapshots to Google Sheets</span>
+                <p style={{ fontSize: '11.5px', color: '#64748b', margin: '2px 0 0 0', lineHeight: '1.4' }}>
+                  Create automatic App State & CRM Config snapshots on your Google Sheet before resetting.
+                </p>
+              </div>
+            </label>
+          ) : (
+            <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px', opacity: 0.6 }}>
+              <input type="checkbox" disabled style={{ width: '17px', height: '17px', marginTop: '2px' }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#94a3b8' }}>Backup Snapshots to Google Sheets (Unavailable)</span>
+                <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: '2px 0 0 0', lineHeight: '1.4' }}>
+                  Only available when connected to a Google Sheets Apps Script URL.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
