@@ -113,7 +113,7 @@ npm run build
 
 ## 📋 Google Sheets Backend Integration
 
-If you choose the recommended **Google Sheets Cloud Sync** mode, you will need to host a Google Apps Script Web App that handles backend database operations. The backend script file is located at [gvcrm-appscript.gs](./gvcrm-appscript.gs).
+If you choose the recommended **Google Sheets Cloud Sync** mode, you will need to host a Google Apps Script Web App that handles backend database operations. The backend script file is located at [gsheet-appscript.gs](./gsheet-appscript.gs).
 
 This Apps Script handles GET/POST requests and interacts with four core spreadsheet tabs:
 * **`Contacts`** — Stores name, phone, email, handle, status, category, lead source, location, and notes.
@@ -121,7 +121,7 @@ This Apps Script handles GET/POST requests and interacts with four core spreadsh
 * **`ContactListMembers`** — Tracks memberships mapping contacts to lists.
 * **`DataSnapshots`** — Saves configuration snapshots, form templates, and logs.
 
-For detailed request payloads, required spreadsheet column structures, deployment guides, and API endpoint specs, please refer to the [INTEGRATION-GSHEET.md](./INTEGRATION-GSHEET.md) specification file.
+For detailed request payloads, required spreadsheet column structures, deployment guides, and API endpoint specs, please refer to the [GSHEET-INTEGRATIONS.md](./GSHEET-INTEGRATIONS.md) specification file.
 
 ---
 

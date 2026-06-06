@@ -1,9 +1,9 @@
 /**
  * ============================================================================
- *  GV-CRM / GSHEET APPSCRIPT
+ *  GSHEET-CRM / APPSCRIPT
  * ============================================================================
  *
- *  Google Apps Script Web App API acting as the cloud database for GV-CRM.
+ *  Google Apps Script Web App API acting as the cloud database for GSHEET-CRM.
  *  Handles transactional contact saving, list memberships, and configuration 
  *  state snapshots. Row values are indexed dynamically by header name,
  *  meaning sheet columns can be safely reordered or customized.

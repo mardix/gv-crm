@@ -1,6 +1,6 @@
-# Google Sheets Integration Guide
+# GSHEET-CRM / Google Sheets Integration Guide
 
-This guide details how to integrate **GSHEET CRM** with **Google Sheets** for robust, cross-device database synchronization and cloud backups.
+This guide details how to integrate **GSHEET-CRM** with **Google Sheets** for robust, cross-device database synchronization and cloud backups.
 
 The backend integration is powered by **Google Apps Script** running as a Web App API over a target Google Sheet. It dynamically manages contacts, list segments, list memberships, and gzipped state backups.
 
@@ -13,7 +13,7 @@ To set up your Google Sheets backend:
 1. **Create a Google Sheet** inside your Google Drive.
 2. Open the spreadsheet, and navigate to **Extensions** ➔ **Apps Script**.
 3. Clear any default code in the editor.
-4. Copy the entire contents of the [gvcrm-appscript.gs](./gvcrm-appscript.gs) script file from this repository and paste it into the editor.
+4. Copy the entire contents of the [gsheet-appscript.gs](./gsheet-appscript.gs) script file from this repository and paste it into the editor.
 5. **Set up Google Drive Folder (Highly Recommended)**:
    - Large snapshots and database backups will exceed Google Sheets cell limits. To prevent these from cluttering your Google Drive root folder, create a new folder in Drive.
    - Copy the Folder ID from the URL (e.g., the string of characters after `folders/` in the URL: `https://drive.google.com/drive/u/0/folders/YOUR_FOLDER_ID`).
@@ -26,19 +26,19 @@ To set up your Google Sheets backend:
    - Click **Deploy** ➔ **New deployment** (top-right).
    - Click the gear icon next to "Select type" and select **Web app**.
    - Configure the deployment:
-     - **Description**: `GSHEET CRM Web App Database API`
+     - **Description**: `GSHEET-CRM Web App Database API`
      - **Execute as**: `Me (your-email@gmail.com)`
      - **Who has access**: `Anyone` (this allows the extension to make POST/GET requests without complex OAuth login flows).
    - Click **Deploy**.
-   - Grant permissions when prompted (Google may warn you the app is unverified; click *Advanced* ➔ *Go to GSHEET CRM (unsafe)* to proceed).
+   - Grant permissions when prompted (Google may warn you the app is unverified; click *Advanced* ➔ *Go to GSHEET-CRM (unsafe)* to proceed).
 8. Copy the generated **Web App URL** (e.g., `https://script.google.com/macros/s/.../exec`).
-9. Paste this URL into the **Storage & Sync** tab inside the GSHEET CRM extension Settings, or use it during the onboarding setup.
+9. Paste this URL into the **Storage & Sync** tab inside the GSHEET-CRM extension Settings, or use it during the onboarding setup.
 
 ---
 
 ## 📊 Database Schema & Sheet Structures
 
-When you configure the extension for the first time or manually run the sync, GSHEET CRM triggers the `initSchema` action. The script automatically generates the necessary tables and headers. 
+When you configure the extension for the first time or manually run the sync, GSHEET-CRM triggers the `initSchema` action. The script automatically generates the necessary tables and headers. 
 
 > [!NOTE]
 > Do not modify the required column header names. However, you can add extra custom columns or reorder the existing ones as columns are looked up dynamically by header text.
